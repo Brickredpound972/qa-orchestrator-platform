@@ -24,9 +24,9 @@ public class QaController {
     }
 
     @PostMapping(
-            value = "/api/v1/qa/analyze",
-            consumes = MediaType.APPLICATION_JSON_VALUE,
-            produces = MediaType.APPLICATION_JSON_VALUE
+        value = {"/api/v1/qa/analyze", "/analyze", "/qa/analyze"},
+        consumes = MediaType.APPLICATION_JSON_VALUE,
+        produces = MediaType.APPLICATION_JSON_VALUE
     )
     public QaAnalyzeResponse analyze(@RequestBody QaAnalyzeRequest request) {
         String result = service.runAnalysis(request.getIssueKey());
