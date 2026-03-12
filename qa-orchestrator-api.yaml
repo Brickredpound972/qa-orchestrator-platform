@@ -1,0 +1,34 @@
+openapi: 3.0.0
+info:
+  title: QA Orchestrator API
+  version: "1.0.0"
+  description: Analyze a Jira issue and return QA analysis as JSON.
+
+servers:
+  - url: https://your-render-service.onrender.com
+
+paths:
+  /qa/run/{issueKey}:
+    post:
+      operationId: analyzeJiraIssue
+      summary: Run QA analysis
+      description: Runs QA analysis for a Jira issue key and returns JSON.
+      parameters:
+        - name: issueKey
+          in: path
+          required: true
+          description: Jira issue key
+          schema:
+            type: string
+      responses:
+        "200":
+          description: QA analysis response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  output:
+                    type: string
+                required:
+                  - output

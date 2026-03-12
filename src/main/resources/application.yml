@@ -1,0 +1,7 @@
+server:
+  port: ${PORT:10000}
+
+jira:
+  base-url: ${JIRA_BASE_URL}
+  email: ${JIRA_EMAIL}
+  api-token: ${JIRA_API_TOKEN}
