@@ -6,8 +6,6 @@ import com.qa.qa_orchestrator_service.service.QaOrchestratorService;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Map;
-
 @RestController
 @RequestMapping("/qa")
 public class QaController {
@@ -18,18 +16,46 @@ public class QaController {
         this.service = service;
     }
 
-    @PostMapping(value = "/run/{issueKey}", produces = MediaType.APPLICATION_JSON_VALUE)
-    public Map<String, String> run(@PathVariable String issueKey) {
-        return Map.of("output", service.runAnalysis(issueKey));
-    }
-
+    /**
+     * Canonical API endpoint (primary endpoint going forward)
+     */
     @PostMapping(
-        value = {"/api/v1/qa/analyze", "/analyze", "/qa/analyze"},
-        consumes = MediaType.APPLICATION_JSON_VALUE,
-        produces = MediaType.APPLICATION_JSON_VALUE
+            value = "/api/v1/qa/analyze",
+            consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE
     )
     public QaAnalyzeResponse analyze(@RequestBody QaAnalyzeRequest request) {
-        String result = service.runAnalysis(request.getIssueKey());
+        return executeAnalysis(request.getIssueKey());
+    }
+
+    /**
+     * Legacy endpoint used by earlier integrations (Copilot fallback)
+     */
+    @PostMapping(
+            value = "/run/{issueKey}",
+            produces = MediaType.APPLICATION_JSON_VALUE
+    )
+    public QaAnalyzeResponse run(@PathVariable String issueKey) {
+        return executeAnalysis(issueKey);
+    }
+
+    /**
+     * Compatibility alias for unstable clients or tool mappings
+     */
+    @PostMapping(
+            value = "/analyze",
+            consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE
+    )
+    public QaAnalyzeResponse analyzeAlias(@RequestBody QaAnalyzeRequest request) {
+        return executeAnalysis(request.getIssueKey());
+    }
+
+    /**
+     * Centralized execution logic
+     */
+    private QaAnalyzeResponse executeAnalysis(String issueKey) {
+        String result = service.runAnalysis(issueKey);
         return new QaAnalyzeResponse(result);
     }
 }

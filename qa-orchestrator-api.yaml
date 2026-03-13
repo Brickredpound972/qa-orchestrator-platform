@@ -1,34 +1,36 @@
-openapi: 3.0.0
+swagger: '2.0'
 info:
   title: QA Orchestrator API
-  version: "1.0.0"
-  description: Analyze a Jira issue and return QA analysis as JSON.
+  description: Runs QA analysis for a Jira issue and returns a JSON response.
+  version: '1.0.0'
 
-servers:
-  - url: https://your-render-service.onrender.com
+host: qa-orchestrator-service.onrender.com
+basePath: /
+schemes:
+  - https
 
 paths:
   /qa/run/{issueKey}:
     post:
-      operationId: analyzeJiraIssue
+      operationId: runQaAnalysis
       summary: Run QA analysis
-      description: Runs QA analysis for a Jira issue key and returns JSON.
+      description: Runs QA analysis for the provided Jira issue key.
+      produces:
+        - application/json
       parameters:
         - name: issueKey
           in: path
+          description: Jira issue key, for example PROJ-4
           required: true
-          description: Jira issue key
-          schema:
-            type: string
+          type: string
       responses:
-        "200":
-          description: QA analysis response
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  output:
-                    type: string
-                required:
-                  - output
+        '200':
+          description: QA analysis result
+          schema:
+            type: object
+            required:
+              - output
+            properties:
+              output:
+                type: string
+                description: QA analysis result text
