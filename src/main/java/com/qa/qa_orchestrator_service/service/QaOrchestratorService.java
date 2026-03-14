@@ -18,9 +18,6 @@ public class QaOrchestratorService {
     }
 
     public String runAnalysis(String issueKey) {
-
-        String issue = jiraClient.getIssue(issueKey);
-
         String analysis = """
                 QA Orchestrator Analysis
 
@@ -43,7 +40,6 @@ public class QaOrchestratorService {
                 """;
 
         jiraClient.addComment(issueKey, analysis);
-
         return analysis;
     }
 
@@ -56,7 +52,6 @@ public class QaOrchestratorService {
 
         String rawRiskLevel = extractSingleValue(raw, "Risk Level:");
         String riskReason = extractSingleValue(raw, "Reason:");
-
         int riskScore = calculateRiskScore(raw, rawRiskLevel);
 
         result.setRiskScore(riskScore);
@@ -73,7 +68,7 @@ public class QaOrchestratorService {
         result.setOutOfScope(buildOutOfScope(raw));
 
         result.setTestScenarios(extractBulletSection(raw, "Test Strategy:"));
-        result.setTestCases(buildPlaceholderTestCases());
+        result.setTestCases(buildGeneratedTestCases(result));
         result.setRawOutput(raw);
 
         return result;
@@ -136,67 +131,6 @@ public class QaOrchestratorService {
         return items;
     }
 
-    private List<QaTestCase> buildPlaceholderTestCases() {
-        List<QaTestCase> testCases = new ArrayList<>();
-
-        testCases.add(new QaTestCase(
-                "TC-01",
-                "Validate happy path coupon application",
-                "User has an active cart session",
-                List.of("Open checkout", "Enter a valid coupon", "Apply coupon"),
-                "Discount should be applied successfully",
-                "UI",
-                "Smoke",
-                "Valid coupon",
-                "High"));
-
-        testCases.add(new QaTestCase(
-                "TC-02",
-                "Reject invalid coupon",
-                "User has an active cart session",
-                List.of("Open checkout", "Enter an invalid coupon", "Apply coupon"),
-                "System should reject invalid coupon with clear validation message",
-                "UI",
-                "Regression",
-                "Invalid coupon",
-                "High"));
-
-        testCases.add(new QaTestCase(
-                "TC-03",
-                "Prevent multiple coupon application",
-                "User already applied one coupon",
-                List.of("Apply first coupon", "Try applying second coupon"),
-                "System should enforce single coupon rule",
-                "UI",
-                "Regression",
-                "Two valid coupons",
-                "High"));
-
-        testCases.add(new QaTestCase(
-                "TC-04",
-                "Validate subtotal calculation before tax",
-                "User has taxable items in cart",
-                List.of("Open checkout", "Apply coupon", "Review subtotal"),
-                "Discount should affect subtotal before tax calculation",
-                "API",
-                "Regression",
-                "Coupon + taxable cart",
-                "High"));
-
-        testCases.add(new QaTestCase(
-                "TC-05",
-                "Validate session persistence for coupon state",
-                "User has applied a coupon",
-                List.of("Apply coupon", "Refresh page or continue same session"),
-                "Coupon state should persist in the same session",
-                "E2E",
-                "Regression",
-                "Same session flow",
-                "Medium"));
-
-        return testCases;
-    }
-
     private List<String> buildTopRiskDrivers(String raw) {
         List<String> drivers = new ArrayList<>();
 
@@ -230,12 +164,17 @@ public class QaOrchestratorService {
             score += 10;
         }
 
-        if (lower.contains("financial impact") || lower.contains("subtotal") || lower.contains("tax")
-                || lower.contains("discount") || lower.contains("coupon")) {
+        if (lower.contains("financial impact")
+                || lower.contains("subtotal")
+                || lower.contains("tax")
+                || lower.contains("discount")
+                || lower.contains("coupon")) {
             score += 15;
         }
 
-        if (lower.contains("multiple coupon") || lower.contains("restriction") || lower.contains("validation")) {
+        if (lower.contains("multiple coupon")
+                || lower.contains("restriction")
+                || lower.contains("validation")) {
             score += 10;
         }
 
@@ -344,5 +283,155 @@ public class QaOrchestratorService {
         items.add("Coupon management admin flows");
         items.add("Promotion creation and configuration");
         return items;
+    }
+
+    private List<QaTestCase> buildGeneratedTestCases(QaAnalysisResult result) {
+        List<QaTestCase> testCases = new ArrayList<>();
+
+        List<String> scenarios = result.getTestScenarios() != null
+                ? result.getTestScenarios()
+                : new ArrayList<>();
+
+        List<String> edgeCases = result.getEdgeCases() != null
+                ? result.getEdgeCases()
+                : new ArrayList<>();
+
+        int tcIndex = 1;
+
+        for (String scenario : scenarios) {
+            String normalized = scenario.toLowerCase();
+
+            if (normalized.contains("invalid")) {
+                testCases.add(new QaTestCase(
+                        formatTestCaseId(tcIndex++),
+                        "Reject invalid coupon code",
+                        "User has items in cart and an active checkout session",
+                        List.of("Open checkout", "Enter an invalid coupon", "Apply coupon"),
+                        "System should reject the coupon and display validation feedback",
+                        "UI",
+                        "Regression",
+                        "Invalid coupon",
+                        "High"));
+            } else if (normalized.contains("valid")) {
+                testCases.add(new QaTestCase(
+                        formatTestCaseId(tcIndex++),
+                        "Validate valid coupon application",
+                        "User has items in cart and an active checkout session",
+                        List.of("Open checkout", "Enter a valid coupon", "Apply coupon"),
+                        "System should accept the coupon and apply the discount",
+                        "UI",
+                        "Smoke",
+                        "Valid coupon",
+                        "High"));
+            } else if (normalized.contains("multiple")) {
+                testCases.add(new QaTestCase(
+                        formatTestCaseId(tcIndex++),
+                        "Prevent multiple coupon application",
+                        "User already applied one valid coupon",
+                        List.of("Apply first coupon", "Attempt to apply a second coupon"),
+                        "System should enforce the single coupon restriction",
+                        "UI",
+                        "Regression",
+                        "Two valid coupons",
+                        "High"));
+            } else if (normalized.contains("subtotal")) {
+                testCases.add(new QaTestCase(
+                        formatTestCaseId(tcIndex++),
+                        "Validate subtotal calculation before tax",
+                        "User has taxable items in cart and a valid coupon",
+                        List.of("Open checkout", "Apply valid coupon", "Review subtotal before tax"),
+                        "Discount should be reflected in subtotal before tax is calculated",
+                        "API",
+                        "Regression",
+                        "Coupon + taxable cart",
+                        "High"));
+            } else if (normalized.contains("session")) {
+                testCases.add(new QaTestCase(
+                        formatTestCaseId(tcIndex++),
+                        "Validate coupon persistence in same session",
+                        "User has successfully applied a coupon",
+                        List.of("Apply coupon", "Refresh the page within the same session"),
+                        "Coupon state should persist during the same user session",
+                        "E2E",
+                        "Regression",
+                        "Same session",
+                        "Medium"));
+            }
+        }
+
+        for (String edgeCase : edgeCases) {
+            String normalized = edgeCase.toLowerCase();
+
+            if (normalized.contains("invalid coupon")
+                    && !containsTitle(testCases, "Reject invalid coupon code")) {
+                testCases.add(new QaTestCase(
+                        formatTestCaseId(tcIndex++),
+                        "Reject invalid coupon code",
+                        "User has items in cart and an active checkout session",
+                        List.of("Open checkout", "Enter an invalid coupon", "Apply coupon"),
+                        "System should reject the coupon and display validation feedback",
+                        "UI",
+                        "Regression",
+                        "Invalid coupon",
+                        "High"));
+            }
+
+            if (normalized.contains("second coupon")
+                    && !containsTitle(testCases, "Prevent multiple coupon application")) {
+                testCases.add(new QaTestCase(
+                        formatTestCaseId(tcIndex++),
+                        "Prevent multiple coupon application",
+                        "User already applied one valid coupon",
+                        List.of("Apply first coupon", "Attempt to apply a second coupon"),
+                        "System should enforce the single coupon restriction",
+                        "UI",
+                        "Regression",
+                        "Two valid coupons",
+                        "High"));
+            }
+
+            if (normalized.contains("subtotal")
+                    && !containsTitle(testCases, "Validate subtotal calculation before tax")) {
+                testCases.add(new QaTestCase(
+                        formatTestCaseId(tcIndex++),
+                        "Validate subtotal calculation before tax",
+                        "User has taxable items in cart and a valid coupon",
+                        List.of("Open checkout", "Apply valid coupon", "Review subtotal before tax"),
+                        "Discount should be reflected in subtotal before tax is calculated",
+                        "API",
+                        "Regression",
+                        "Coupon + taxable cart",
+                        "High"));
+            }
+
+            if ((normalized.contains("same session") || normalized.contains("refresh"))
+                    && !containsTitle(testCases, "Validate coupon persistence in same session")) {
+                testCases.add(new QaTestCase(
+                        formatTestCaseId(tcIndex++),
+                        "Validate coupon persistence in same session",
+                        "User has successfully applied a coupon",
+                        List.of("Apply coupon", "Refresh the page within the same session"),
+                        "Coupon state should persist during the same user session",
+                        "E2E",
+                        "Regression",
+                        "Same session",
+                        "Medium"));
+            }
+        }
+
+        return testCases;
+    }
+
+    private String formatTestCaseId(int index) {
+        return String.format("TC-%02d", index);
+    }
+
+    private boolean containsTitle(List<QaTestCase> testCases, String title) {
+        for (QaTestCase testCase : testCases) {
+            if (testCase.getTitle() != null && testCase.getTitle().equalsIgnoreCase(title)) {
+                return true;
+            }
+        }
+        return false;
     }
 }
