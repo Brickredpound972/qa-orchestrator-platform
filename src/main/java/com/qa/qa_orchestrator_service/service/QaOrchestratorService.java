@@ -22,25 +22,25 @@ public class QaOrchestratorService {
         String issue = jiraClient.getIssue(issueKey);
 
         String analysis = """
-        QA Orchestrator Analysis
+                QA Orchestrator Analysis
 
-        Requirement Analysis: READY. Coupon entry, validation,
-        single coupon enforcement, and session persistence detected.
+                Requirement Analysis: READY. Coupon entry, validation,
+                single coupon enforcement, and session persistence detected.
 
-        Test Strategy:
-        - Valid coupon
-        - Invalid coupon
-        - Multiple coupon restriction
-        - Subtotal before tax
-        - Session persistence
+                Test Strategy:
+                - Valid coupon
+                - Invalid coupon
+                - Multiple coupon restriction
+                - Subtotal before tax
+                - Session persistence
 
-        Automation Recommendation: Hybrid (UI + API)
+                Automation Recommendation: Hybrid (UI + API)
 
-        Risk Level: HIGH
-        Reason: Checkout flow, financial impact, regression risk.
+                Risk Level: HIGH
+                Reason: Checkout flow, financial impact, regression risk.
 
-        Release Recommendation: Caution until regression coverage confirmed.
-        """;
+                Release Recommendation: Caution until regression coverage confirmed.
+                """;
 
         jiraClient.addComment(issueKey, analysis);
 
@@ -66,11 +66,12 @@ public class QaOrchestratorService {
         result.setRawReleaseRecommendation(extractSingleValue(raw, "Release Recommendation:"));
         result.setReleaseRecommendation(mapReleaseRecommendation(riskScore));
 
-        result.setClarifiedRequirements(new ArrayList<>());
-        result.setEdgeCases(new ArrayList<>());
-        result.setOpenQuestions(new ArrayList<>());
-        result.setScope(new ArrayList<>());
-        result.setOutOfScope(new ArrayList<>());
+        result.setClarifiedRequirements(buildClarifiedRequirements(raw));
+        result.setEdgeCases(buildEdgeCases(raw));
+        result.setOpenQuestions(buildOpenQuestions(raw));
+        result.setScope(buildScope(raw));
+        result.setOutOfScope(buildOutOfScope(raw));
+
         result.setTestScenarios(extractBulletSection(raw, "Test Strategy:"));
         result.setTestCases(buildPlaceholderTestCases());
         result.setRawOutput(raw);
@@ -147,8 +148,7 @@ public class QaOrchestratorService {
                 "UI",
                 "Smoke",
                 "Valid coupon",
-                "High"
-        ));
+                "High"));
 
         testCases.add(new QaTestCase(
                 "TC-02",
@@ -159,8 +159,7 @@ public class QaOrchestratorService {
                 "UI",
                 "Regression",
                 "Invalid coupon",
-                "High"
-        ));
+                "High"));
 
         testCases.add(new QaTestCase(
                 "TC-03",
@@ -171,8 +170,7 @@ public class QaOrchestratorService {
                 "UI",
                 "Regression",
                 "Two valid coupons",
-                "High"
-        ));
+                "High"));
 
         testCases.add(new QaTestCase(
                 "TC-04",
@@ -183,8 +181,7 @@ public class QaOrchestratorService {
                 "API",
                 "Regression",
                 "Coupon + taxable cart",
-                "High"
-        ));
+                "High"));
 
         testCases.add(new QaTestCase(
                 "TC-05",
@@ -195,8 +192,7 @@ public class QaOrchestratorService {
                 "E2E",
                 "Regression",
                 "Same session flow",
-                "Medium"
-        ));
+                "Medium"));
 
         return testCases;
     }
@@ -273,5 +269,80 @@ public class QaOrchestratorService {
             return "Caution";
         }
         return "Go";
+    }
+
+    private List<String> buildClarifiedRequirements(String raw) {
+        List<String> items = new ArrayList<>();
+        String lower = raw == null ? "" : raw.toLowerCase();
+
+        if (lower.contains("coupon")) {
+            items.add("User can enter and apply a coupon code during checkout.");
+        }
+        if (lower.contains("validation")) {
+            items.add("Coupon input must be validated before discount is applied.");
+        }
+        if (lower.contains("single coupon")) {
+            items.add("Only one coupon can be applied per checkout session.");
+        }
+        if (lower.contains("session persistence")) {
+            items.add("Applied coupon state must persist within the same session.");
+        }
+
+        return items;
+    }
+
+    private List<String> buildEdgeCases(String raw) {
+        List<String> items = new ArrayList<>();
+        String lower = raw == null ? "" : raw.toLowerCase();
+
+        if (lower.contains("invalid coupon")) {
+            items.add("Invalid coupon code is entered.");
+        }
+        if (lower.contains("multiple coupon")) {
+            items.add("User attempts to apply a second coupon after one is already active.");
+        }
+        if (lower.contains("subtotal")) {
+            items.add("Discount affects subtotal before tax calculation.");
+        }
+        if (lower.contains("session")) {
+            items.add("Coupon remains applied after refresh within the same session.");
+        }
+
+        return items;
+    }
+
+    private List<String> buildOpenQuestions(String raw) {
+        return new ArrayList<>();
+    }
+
+    private List<String> buildScope(String raw) {
+        List<String> items = new ArrayList<>();
+        String lower = raw == null ? "" : raw.toLowerCase();
+
+        if (lower.contains("coupon")) {
+            items.add("Coupon entry and application flow");
+        }
+        if (lower.contains("validation")) {
+            items.add("Coupon validation behavior");
+        }
+        if (lower.contains("multiple coupon")) {
+            items.add("Single coupon enforcement");
+        }
+        if (lower.contains("subtotal")) {
+            items.add("Discount impact on subtotal before tax");
+        }
+        if (lower.contains("session")) {
+            items.add("Same-session coupon persistence");
+        }
+
+        return items;
+    }
+
+    private List<String> buildOutOfScope(String raw) {
+        List<String> items = new ArrayList<>();
+        items.add("Cross-device persistence");
+        items.add("Coupon management admin flows");
+        items.add("Promotion creation and configuration");
+        return items;
     }
 }
