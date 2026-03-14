@@ -18,27 +18,8 @@ public class QaOrchestratorService {
     }
 
     public String runAnalysis(String issueKey) {
-        String analysis = """
-                QA Orchestrator Analysis
-
-                Requirement Analysis: READY. Coupon entry, validation,
-                single coupon enforcement, and session persistence detected.
-
-                Test Strategy:
-                - Valid coupon
-                - Invalid coupon
-                - Multiple coupon restriction
-                - Subtotal before tax
-                - Session persistence
-
-                Automation Recommendation: Hybrid (UI + API)
-
-                Risk Level: HIGH
-                Reason: Checkout flow, financial impact, regression risk.
-
-                Release Recommendation: Caution until regression coverage confirmed.
-                """;
-
+        String issue = jiraClient.getIssue(issueKey);
+        String analysis = buildAnalysisFromIssue(issueKey, issue);
         jiraClient.addComment(issueKey, analysis);
         return analysis;
     }
@@ -46,7 +27,7 @@ public class QaOrchestratorService {
     public QaAnalysisResult buildStructuredAnalysis(String issueKey, String raw) {
         QaAnalysisResult result = new QaAnalysisResult();
         result.setTraceabilityId(issueKey);
-        result.setFeatureSummary("Derived from Jira issue " + issueKey);
+        result.setFeatureSummary(buildFeatureSummary(raw));
         result.setRequirementStatus(extractStatus(raw));
         result.setAutomationRecommendation(extractSingleValue(raw, "Automation Recommendation:"));
 
@@ -220,10 +201,14 @@ public class QaOrchestratorService {
         if (lower.contains("validation")) {
             items.add("Coupon input must be validated before discount is applied.");
         }
-        if (lower.contains("single coupon")) {
+        if (lower.contains("single coupon")
+                || lower.contains("multiple coupon")
+                || lower.contains("one coupon")) {
             items.add("Only one coupon can be applied per checkout session.");
         }
-        if (lower.contains("session persistence")) {
+        if (lower.contains("session persistence")
+                || lower.contains("same session")
+                || lower.contains("session")) {
             items.add("Applied coupon state must persist within the same session.");
         }
 
@@ -251,7 +236,26 @@ public class QaOrchestratorService {
     }
 
     private List<String> buildOpenQuestions(String raw) {
-        return new ArrayList<>();
+        List<String> items = new ArrayList<>();
+        String lower = raw == null ? "" : raw.toLowerCase();
+
+        if (!lower.contains("expiry") && lower.contains("coupon")) {
+            items.add("Should expired coupons be rejected with a specific validation message?");
+        }
+
+        if (!lower.contains("stack") && lower.contains("coupon")) {
+            items.add("Is coupon stacking always disallowed, or only for this checkout flow?");
+        }
+
+        if (!lower.contains("guest") && lower.contains("checkout")) {
+            items.add("Does the coupon behavior differ for guest and authenticated users?");
+        }
+
+        if (!lower.contains("currency") && (lower.contains("subtotal") || lower.contains("discount"))) {
+            items.add("Are there any currency, rounding, or localization rules affecting subtotal calculation?");
+        }
+
+        return items;
     }
 
     private List<String> buildScope(String raw) {
@@ -433,5 +437,182 @@ public class QaOrchestratorService {
             }
         }
         return false;
+    }
+
+    private String buildAnalysisFromIssue(String issueKey, String issue) {
+        String lower = issue == null ? "" : issue.toLowerCase();
+
+        List<String> scenarios = deriveScenariosFromIssue(lower);
+        String requirementStatus = deriveRequirementStatus(lower);
+        String automationRecommendation = deriveAutomationRecommendation(lower);
+        String riskLevel = deriveRiskLevel(lower);
+        String riskReason = deriveRiskReason(lower);
+        String releaseRecommendation = deriveRawReleaseRecommendation(lower, riskLevel);
+
+        StringBuilder builder = new StringBuilder();
+        builder.append("QA Orchestrator Analysis\n\n");
+        builder.append("Requirement Analysis: ").append(requirementStatus).append(". ");
+
+        if ("READY".equals(requirementStatus)) {
+            builder.append("Requirements appear testable based on available issue context.\n\n");
+        } else {
+            builder.append("Critical testing details are missing from the issue context.\n\n");
+        }
+
+        builder.append("Test Strategy:\n");
+        for (String scenario : scenarios) {
+            builder.append("- ").append(scenario).append("\n");
+        }
+
+        builder.append("\n");
+        builder.append("Automation Recommendation: ").append(automationRecommendation).append("\n\n");
+        builder.append("Risk Level: ").append(riskLevel).append("\n");
+        builder.append("Reason: ").append(riskReason).append("\n\n");
+        builder.append("Release Recommendation: ").append(releaseRecommendation);
+
+        return builder.toString();
+    }
+
+    private List<String> deriveScenariosFromIssue(String lower) {
+        List<String> scenarios = new ArrayList<>();
+
+        if (lower.contains("coupon")) {
+            scenarios.add("Valid coupon");
+            scenarios.add("Invalid coupon");
+        }
+
+        if (lower.contains("single") || lower.contains("multiple coupon") || lower.contains("one coupon")) {
+            scenarios.add("Multiple coupon restriction");
+        }
+
+        if (lower.contains("subtotal") || lower.contains("tax") || lower.contains("discount")) {
+            scenarios.add("Subtotal before tax");
+        }
+
+        if (lower.contains("session") || lower.contains("persist")) {
+            scenarios.add("Session persistence");
+        }
+
+        if (scenarios.isEmpty()) {
+            scenarios.add("Core happy path");
+            scenarios.add("Negative validation path");
+        }
+
+        return scenarios;
+    }
+
+    private String deriveRequirementStatus(String lower) {
+        if (lower.isBlank()) {
+            return "BLOCKED";
+        }
+        return "READY";
+    }
+
+    private String deriveAutomationRecommendation(String lower) {
+        if (lower == null || lower.isBlank()) {
+            return "Manual";
+        }
+
+        boolean hasUiSignals = lower.contains("checkout")
+                || lower.contains("coupon")
+                || lower.contains("session")
+                || lower.contains("user")
+                || lower.contains("page")
+                || lower.contains("ui");
+
+        boolean hasApiSignals = lower.contains("api")
+                || lower.contains("service")
+                || lower.contains("subtotal")
+                || lower.contains("tax")
+                || lower.contains("discount")
+                || lower.contains("validation");
+
+        if (hasUiSignals && hasApiSignals) {
+            return "Hybrid (UI + API)";
+        }
+        if (hasApiSignals) {
+            return "Automation (API-heavy)";
+        }
+        if (hasUiSignals) {
+            return "Automation (UI-heavy)";
+        }
+
+        return "Automation";
+    }
+
+    private String deriveRiskLevel(String lower) {
+        int score = 0;
+
+        if (lower.contains("checkout") || lower.contains("payment") || lower.contains("login")) {
+            score += 20;
+        }
+        if (lower.contains("session") || lower.contains("persist")) {
+            score += 10;
+        }
+        if (lower.contains("subtotal") || lower.contains("tax") || lower.contains("discount")
+                || lower.contains("coupon")) {
+            score += 15;
+        }
+        if (lower.contains("regression") || lower.contains("existing")) {
+            score += 15;
+        }
+
+        if (score >= 40) {
+            return "HIGH";
+        }
+        if (score >= 20) {
+            return "MEDIUM";
+        }
+        return "LOW";
+    }
+
+    private String deriveRiskReason(String lower) {
+        List<String> reasons = new ArrayList<>();
+
+        if (lower.contains("checkout")) {
+            reasons.add("Checkout flow");
+        }
+        if (lower.contains("payment") || lower.contains("subtotal") || lower.contains("tax")
+                || lower.contains("discount")) {
+            reasons.add("Financial impact");
+        }
+        if (lower.contains("session") || lower.contains("persist")) {
+            reasons.add("Session/state behavior");
+        }
+        if (lower.contains("coupon")) {
+            reasons.add("Promotion validation complexity");
+        }
+
+        if (reasons.isEmpty()) {
+            reasons.add("General feature risk");
+        }
+
+        return String.join(", ", reasons);
+    }
+
+    private String deriveRawReleaseRecommendation(String lower, String riskLevel) {
+        if ("HIGH".equalsIgnoreCase(riskLevel)) {
+            return "Caution until regression coverage confirmed.";
+        }
+        if ("MEDIUM".equalsIgnoreCase(riskLevel)) {
+            return "Proceed with controlled validation.";
+        }
+        return "Go with standard validation.";
+    }
+
+    private String buildFeatureSummary(String raw) {
+        String lower = raw == null ? "" : raw.toLowerCase();
+
+        if (lower.contains("coupon") && lower.contains("checkout")) {
+            return "Coupon validation and application behavior during checkout.";
+        }
+        if (lower.contains("coupon")) {
+            return "Coupon application and validation flow.";
+        }
+        if (lower.contains("checkout")) {
+            return "Checkout-related validation and session behavior.";
+        }
+
+        return "QA analysis generated from available issue context.";
     }
 }
