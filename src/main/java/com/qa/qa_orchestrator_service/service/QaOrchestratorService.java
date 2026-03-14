@@ -63,6 +63,7 @@ public class QaOrchestratorService {
         result.setRiskLevel(mapRiskLevel(riskScore, rawRiskLevel));
         result.setRiskReason(riskReason);
         result.setTopRiskDrivers(buildTopRiskDrivers(raw));
+        result.setRawReleaseRecommendation(extractSingleValue(raw, "Release Recommendation:"));
         result.setReleaseRecommendation(mapReleaseRecommendation(riskScore));
 
         result.setClarifiedRequirements(new ArrayList<>());

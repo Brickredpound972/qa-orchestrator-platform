@@ -20,6 +20,7 @@ public class QaAnalysisResult {
     private List<QaTestCase> testCases;
     private String rawOutput;
     private String riskReason;
+    private String rawReleaseRecommendation;
     private java.util.List<String> topRiskDrivers;
 
     public QaAnalysisResult() {
@@ -159,5 +160,13 @@ public java.util.List<String> getTopRiskDrivers() {
 
 public void setTopRiskDrivers(java.util.List<String> topRiskDrivers) {
     this.topRiskDrivers = topRiskDrivers;
+}
+
+public String getRawReleaseRecommendation() {
+    return rawReleaseRecommendation;
+}
+
+public void setRawReleaseRecommendation(String rawReleaseRecommendation) {
+    this.rawReleaseRecommendation = rawReleaseRecommendation;
 }
 }
