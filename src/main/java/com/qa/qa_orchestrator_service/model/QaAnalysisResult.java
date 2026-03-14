@@ -19,6 +19,8 @@ public class QaAnalysisResult {
     private List<String> testScenarios;
     private List<QaTestCase> testCases;
     private String rawOutput;
+    private String riskReason;
+    private java.util.List<String> topRiskDrivers;
 
     public QaAnalysisResult() {
     }
@@ -142,4 +144,20 @@ public class QaAnalysisResult {
     public void setRawOutput(String rawOutput) {
         this.rawOutput = rawOutput;
     }
+
+    public String getRiskReason() {
+    return riskReason;
+}
+
+public void setRiskReason(String riskReason) {
+    this.riskReason = riskReason;
+}
+
+public java.util.List<String> getTopRiskDrivers() {
+    return topRiskDrivers;
+}
+
+public void setTopRiskDrivers(java.util.List<String> topRiskDrivers) {
+    this.topRiskDrivers = topRiskDrivers;
+}
 }

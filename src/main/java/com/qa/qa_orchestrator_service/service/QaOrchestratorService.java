@@ -57,6 +57,8 @@ public class QaOrchestratorService {
         result.setAutomationRecommendation(extractSingleValue(raw, "Automation Recommendation:"));
         result.setRiskLevel(extractSingleValue(raw, "Risk Level:"));
         result.setReleaseRecommendation(extractSingleValue(raw, "Release Recommendation:"));
+        result.setRiskReason(extractSingleValue(raw, "Reason:"));
+        result.setTopRiskDrivers(buildTopRiskDrivers(raw));
         result.setRiskScore(null);
         result.setClarifiedRequirements(new ArrayList<>());
         result.setEdgeCases(new ArrayList<>());
@@ -192,4 +194,20 @@ public class QaOrchestratorService {
 
         return testCases;
     }
+    private List<String> buildTopRiskDrivers(String raw) {
+        List<String> drivers = new ArrayList<>();
+
+        String reason = extractSingleValue(raw, "Reason:");
+        if (reason != null && !reason.isBlank()) {
+        String[] parts = reason.split(",");
+            for (String part : parts) {
+                String trimmed = part.trim();
+                if (!trimmed.isEmpty()) {
+                drivers.add(trimmed);
+            }
+        }
+    }
+
+    return drivers;
+}
 }
