@@ -47,9 +47,7 @@ public class QaOrchestratorService {
         return analysis;
     }
 
-    public QaAnalysisResult runStructuredAnalysis(String issueKey) {
-        String raw = runAnalysis(issueKey);
-
+    public QaAnalysisResult buildStructuredAnalysis(String issueKey, String raw) {
         QaAnalysisResult result = new QaAnalysisResult();
         result.setTraceabilityId(issueKey);
         result.setFeatureSummary("Derived from Jira issue " + issueKey);
@@ -70,7 +68,7 @@ public class QaOrchestratorService {
         result.setRawOutput(raw);
 
         return result;
-    }
+    }   
 
     private String extractStatus(String raw) {
         if (raw != null && raw.contains("Requirement Analysis: READY")) {
