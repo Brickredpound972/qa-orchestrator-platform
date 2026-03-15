@@ -30,6 +30,7 @@ public class QaAnalysisResult {
     private TestDesignStageArtifact testDesignStage;
     private RiskStageArtifact riskStage;
     private AutomationStageArtifact automationStage;
+    private QaStagesArtifact stages;
 
     public QaAnalysisResult() {
     }
@@ -240,5 +241,13 @@ public class QaAnalysisResult {
 
     public void setAutomationStage(AutomationStageArtifact automationStage) {
         this.automationStage = automationStage;
+    }
+
+    public QaStagesArtifact getStages() {
+        return stages;
+    }
+
+    public void setStages(QaStagesArtifact stages) {
+        this.stages = stages;
     }
 }

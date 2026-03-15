@@ -7,6 +7,7 @@ import com.qa.qa_orchestrator_service.service.stage.RiskAnalysisStage;
 import com.qa.qa_orchestrator_service.service.stage.TestDesignStage;
 import com.qa.qa_orchestrator_service.service.stage.AutomationDecisionStage;
 import com.qa.qa_orchestrator_service.service.stage.AnalysisSummaryStage;
+import com.qa.qa_orchestrator_service.service.stage.StageAggregationStage;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -21,6 +22,7 @@ public class QaOrchestratorService {
     private final RiskAnalysisStage riskAnalysisStage;
     private final AutomationDecisionStage automationDecisionStage;
     private final AnalysisSummaryStage analysisSummaryStage;
+    private final StageAggregationStage stageAggregationStage;
 
     public QaOrchestratorService(
             JiraClient jiraClient,
@@ -28,13 +30,15 @@ public class QaOrchestratorService {
             TestDesignStage testDesignStage,
             RiskAnalysisStage riskAnalysisStage,
             AutomationDecisionStage automationDecisionStage,
-            AnalysisSummaryStage analysisSummaryStage) {
+            AnalysisSummaryStage analysisSummaryStage,
+            StageAggregationStage stageAggregationStage) {
         this.jiraClient = jiraClient;
         this.requirementAnalysisStage = requirementAnalysisStage;
         this.testDesignStage = testDesignStage;
         this.riskAnalysisStage = riskAnalysisStage;
         this.automationDecisionStage = automationDecisionStage;
         this.analysisSummaryStage = analysisSummaryStage;
+        this.stageAggregationStage = stageAggregationStage;
     }
 
     public String runAnalysis(String issueKey) {
@@ -55,6 +59,7 @@ public class QaOrchestratorService {
         automationDecisionStage.apply(result, raw);
         riskAnalysisStage.apply(result, raw);
         analysisSummaryStage.apply(result);
+        stageAggregationStage.apply(result);
 
         return result;
     }
