@@ -5,6 +5,8 @@ import com.qa.qa_orchestrator_service.model.QaAnalysisResult;
 import com.qa.qa_orchestrator_service.service.stage.RequirementAnalysisStage;
 import com.qa.qa_orchestrator_service.service.stage.RiskAnalysisStage;
 import com.qa.qa_orchestrator_service.service.stage.TestDesignStage;
+import com.qa.qa_orchestrator_service.service.stage.AutomationDecisionStage;
+import com.qa.qa_orchestrator_service.service.stage.AnalysisSummaryStage;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -17,17 +19,22 @@ public class QaOrchestratorService {
     private final RequirementAnalysisStage requirementAnalysisStage;
     private final TestDesignStage testDesignStage;
     private final RiskAnalysisStage riskAnalysisStage;
+    private final AutomationDecisionStage automationDecisionStage;
+    private final AnalysisSummaryStage analysisSummaryStage;
 
     public QaOrchestratorService(
             JiraClient jiraClient,
             RequirementAnalysisStage requirementAnalysisStage,
             TestDesignStage testDesignStage,
-            RiskAnalysisStage riskAnalysisStage
-    ) {
+            RiskAnalysisStage riskAnalysisStage,
+            AutomationDecisionStage automationDecisionStage,
+            AnalysisSummaryStage analysisSummaryStage) {
         this.jiraClient = jiraClient;
         this.requirementAnalysisStage = requirementAnalysisStage;
         this.testDesignStage = testDesignStage;
         this.riskAnalysisStage = riskAnalysisStage;
+        this.automationDecisionStage = automationDecisionStage;
+        this.analysisSummaryStage = analysisSummaryStage;
     }
 
     public String runAnalysis(String issueKey) {
@@ -45,7 +52,9 @@ public class QaOrchestratorService {
 
         requirementAnalysisStage.apply(result, raw);
         testDesignStage.apply(result, raw);
+        automationDecisionStage.apply(result, raw);
         riskAnalysisStage.apply(result, raw);
+        analysisSummaryStage.apply(result);
 
         return result;
     }
@@ -138,21 +147,19 @@ public class QaOrchestratorService {
             return "Manual";
         }
 
-        boolean hasUiSignals =
-                lower.contains("checkout")
-                        || lower.contains("coupon")
-                        || lower.contains("session")
-                        || lower.contains("user")
-                        || lower.contains("page")
-                        || lower.contains("ui");
+        boolean hasUiSignals = lower.contains("checkout")
+                || lower.contains("coupon")
+                || lower.contains("session")
+                || lower.contains("user")
+                || lower.contains("page")
+                || lower.contains("ui");
 
-        boolean hasApiSignals =
-                lower.contains("api")
-                        || lower.contains("service")
-                        || lower.contains("subtotal")
-                        || lower.contains("tax")
-                        || lower.contains("discount")
-                        || lower.contains("validation");
+        boolean hasApiSignals = lower.contains("api")
+                || lower.contains("service")
+                || lower.contains("subtotal")
+                || lower.contains("tax")
+                || lower.contains("discount")
+                || lower.contains("validation");
 
         if (hasUiSignals && hasApiSignals) {
             return "Hybrid (UI + API)";

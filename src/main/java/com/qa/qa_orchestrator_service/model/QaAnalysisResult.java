@@ -22,6 +22,10 @@ public class QaAnalysisResult {
     private String riskReason;
     private String rawReleaseRecommendation;
     private java.util.List<String> topRiskDrivers;
+    private String automationReasoning;
+    private String coverageSplit;
+    private String frameworkSuggestion;
+    private String analysisSummary;
 
     public QaAnalysisResult() {
     }
@@ -147,26 +151,58 @@ public class QaAnalysisResult {
     }
 
     public String getRiskReason() {
-    return riskReason;
-}
+        return riskReason;
+    }
 
-public void setRiskReason(String riskReason) {
-    this.riskReason = riskReason;
-}
+    public void setRiskReason(String riskReason) {
+        this.riskReason = riskReason;
+    }
 
-public java.util.List<String> getTopRiskDrivers() {
-    return topRiskDrivers;
-}
+    public java.util.List<String> getTopRiskDrivers() {
+        return topRiskDrivers;
+    }
 
-public void setTopRiskDrivers(java.util.List<String> topRiskDrivers) {
-    this.topRiskDrivers = topRiskDrivers;
-}
+    public void setTopRiskDrivers(java.util.List<String> topRiskDrivers) {
+        this.topRiskDrivers = topRiskDrivers;
+    }
 
-public String getRawReleaseRecommendation() {
-    return rawReleaseRecommendation;
-}
+    public String getRawReleaseRecommendation() {
+        return rawReleaseRecommendation;
+    }
 
-public void setRawReleaseRecommendation(String rawReleaseRecommendation) {
-    this.rawReleaseRecommendation = rawReleaseRecommendation;
-}
+    public void setRawReleaseRecommendation(String rawReleaseRecommendation) {
+        this.rawReleaseRecommendation = rawReleaseRecommendation;
+    }
+
+    public String getAutomationReasoning() {
+        return automationReasoning;
+    }
+
+    public void setAutomationReasoning(String automationReasoning) {
+        this.automationReasoning = automationReasoning;
+    }
+
+    public String getCoverageSplit() {
+        return coverageSplit;
+    }
+
+    public void setCoverageSplit(String coverageSplit) {
+        this.coverageSplit = coverageSplit;
+    }
+
+    public String getFrameworkSuggestion() {
+        return frameworkSuggestion;
+    }
+
+    public void setFrameworkSuggestion(String frameworkSuggestion) {
+        this.frameworkSuggestion = frameworkSuggestion;
+    }
+
+    public String getAnalysisSummary() {
+        return analysisSummary;
+    }
+
+    public void setAnalysisSummary(String analysisSummary) {
+        this.analysisSummary = analysisSummary;
+    }
 }
