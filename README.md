@@ -225,3 +225,19 @@ QA Orchestrator Platform is designed to support modern QA teams by:
 - Smarter requirement ambiguity detection
 - Expanded release decision rules
 - Web dashboard for stage-level QA insights
+
+## Documentation
+
+Project documentation is available in the `/docs` directory.
+
+- **API Contract** → docs/api_contract.md  
+- **Architecture** → docs/architecture.md  
+- **Roadmap** → docs/roadmap.md
+
+## API Endpoints
+
+Current QA analysis endpoints:
+
+POST /qa/api/v1/qa/analyze  
+POST /qa/analyze  
+POST /qa/run/{issueKey}
