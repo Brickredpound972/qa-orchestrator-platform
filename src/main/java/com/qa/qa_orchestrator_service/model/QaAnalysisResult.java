@@ -31,6 +31,7 @@ public class QaAnalysisResult {
     private RiskStageArtifact riskStage;
     private AutomationStageArtifact automationStage;
     private QaStagesArtifact stages;
+    private String contractVersion;
 
     public QaAnalysisResult() {
     }
@@ -249,5 +250,13 @@ public class QaAnalysisResult {
 
     public void setStages(QaStagesArtifact stages) {
         this.stages = stages;
+    }
+
+    public String getContractVersion() {
+        return contractVersion;
+    }
+
+    public void setContractVersion(String contractVersion) {
+        this.contractVersion = contractVersion;
     }
 }

@@ -19,11 +19,7 @@ public class QaController {
     /**
      * Canonical API endpoint (primary endpoint going forward)
      */
-    @PostMapping(
-            value = "/api/v1/qa/analyze",
-            consumes = MediaType.APPLICATION_JSON_VALUE,
-            produces = MediaType.APPLICATION_JSON_VALUE
-    )
+    @PostMapping(value = "/api/v1/qa/analyze", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public QaAnalyzeResponse analyze(@RequestBody QaAnalyzeRequest request) {
         return executeAnalysis(request.getIssueKey());
     }
@@ -31,10 +27,7 @@ public class QaController {
     /**
      * Legacy endpoint used by earlier integrations (Copilot fallback)
      */
-    @PostMapping(
-            value = "/run/{issueKey}",
-            produces = MediaType.APPLICATION_JSON_VALUE
-    )
+    @PostMapping(value = "/run/{issueKey}", produces = MediaType.APPLICATION_JSON_VALUE)
     public QaAnalyzeResponse run(@PathVariable String issueKey) {
         return executeAnalysis(issueKey);
     }
@@ -42,11 +35,7 @@ public class QaController {
     /**
      * Compatibility alias for unstable clients or tool mappings
      */
-    @PostMapping(
-            value = "/analyze",
-            consumes = MediaType.APPLICATION_JSON_VALUE,
-            produces = MediaType.APPLICATION_JSON_VALUE
-    )
+    @PostMapping(value = "/analyze", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public QaAnalyzeResponse analyzeAlias(@RequestBody QaAnalyzeRequest request) {
         return executeAnalysis(request.getIssueKey());
     }
@@ -56,6 +45,7 @@ public class QaController {
      */
     private QaAnalyzeResponse executeAnalysis(String issueKey) {
         String result = service.runAnalysis(issueKey);
+
         return new QaAnalyzeResponse(result, service.buildStructuredAnalysis(issueKey, result));
-    }   
+    }
 }

@@ -51,6 +51,7 @@ public class QaOrchestratorService {
     public QaAnalysisResult buildStructuredAnalysis(String issueKey, String raw) {
         QaAnalysisResult result = new QaAnalysisResult();
         result.setTraceabilityId(issueKey);
+        result.setContractVersion("v2");
         result.setAutomationRecommendation(extractSingleValue(raw, "Automation Recommendation:"));
         result.setRawOutput(raw);
 
@@ -60,6 +61,8 @@ public class QaOrchestratorService {
         riskAnalysisStage.apply(result, raw);
         analysisSummaryStage.apply(result);
         stageAggregationStage.apply(result);
+
+        System.out.println("DEBUG service contractVersion = " + result.getContractVersion());
 
         return result;
     }
