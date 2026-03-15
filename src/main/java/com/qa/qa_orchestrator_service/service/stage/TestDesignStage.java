@@ -2,6 +2,7 @@ package com.qa.qa_orchestrator_service.service.stage;
 
 import com.qa.qa_orchestrator_service.model.QaAnalysisResult;
 import com.qa.qa_orchestrator_service.model.QaTestCase;
+import com.qa.qa_orchestrator_service.model.TestDesignStageArtifact;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -11,8 +12,18 @@ import java.util.List;
 public class TestDesignStage {
 
     public void apply(QaAnalysisResult result, String raw) {
-        result.setTestScenarios(extractBulletSection(raw, "Test Strategy:"));
-        result.setTestCases(buildGeneratedTestCases(result));
+        List<String> scenarios = extractBulletSection(raw, "Test Strategy:");
+        List<QaTestCase> generatedTestCases;
+
+        result.setTestScenarios(scenarios);
+        generatedTestCases = buildGeneratedTestCases(result);
+        result.setTestCases(generatedTestCases);
+
+        TestDesignStageArtifact artifact = new TestDesignStageArtifact();
+        artifact.setTestScenarios(scenarios);
+        artifact.setTestCases(generatedTestCases);
+
+        result.setTestDesignStage(artifact);
     }
 
     private List<String> extractBulletSection(String raw, String sectionHeader) {
@@ -74,8 +85,7 @@ public class TestDesignStage {
                         "UI",
                         "Regression",
                         "Invalid coupon",
-                        "High"
-                ));
+                        "High"));
             } else if (normalized.contains("valid")) {
                 testCases.add(new QaTestCase(
                         formatTestCaseId(tcIndex++),
@@ -86,8 +96,7 @@ public class TestDesignStage {
                         "UI",
                         "Smoke",
                         "Valid coupon",
-                        "High"
-                ));
+                        "High"));
             } else if (normalized.contains("multiple")) {
                 testCases.add(new QaTestCase(
                         formatTestCaseId(tcIndex++),
@@ -98,8 +107,7 @@ public class TestDesignStage {
                         "UI",
                         "Regression",
                         "Two valid coupons",
-                        "High"
-                ));
+                        "High"));
             } else if (normalized.contains("subtotal")) {
                 testCases.add(new QaTestCase(
                         formatTestCaseId(tcIndex++),
@@ -110,8 +118,7 @@ public class TestDesignStage {
                         "API",
                         "Regression",
                         "Coupon + taxable cart",
-                        "High"
-                ));
+                        "High"));
             } else if (normalized.contains("session")) {
                 testCases.add(new QaTestCase(
                         formatTestCaseId(tcIndex++),
@@ -122,8 +129,7 @@ public class TestDesignStage {
                         "E2E",
                         "Regression",
                         "Same session",
-                        "Medium"
-                ));
+                        "Medium"));
             }
         }
 
@@ -141,8 +147,7 @@ public class TestDesignStage {
                         "UI",
                         "Regression",
                         "Invalid coupon",
-                        "High"
-                ));
+                        "High"));
             }
 
             if (normalized.contains("second coupon")
@@ -156,8 +161,7 @@ public class TestDesignStage {
                         "UI",
                         "Regression",
                         "Two valid coupons",
-                        "High"
-                ));
+                        "High"));
             }
 
             if (normalized.contains("subtotal")
@@ -171,8 +175,7 @@ public class TestDesignStage {
                         "API",
                         "Regression",
                         "Coupon + taxable cart",
-                        "High"
-                ));
+                        "High"));
             }
 
             if ((normalized.contains("same session") || normalized.contains("refresh"))
@@ -186,8 +189,7 @@ public class TestDesignStage {
                         "E2E",
                         "Regression",
                         "Same session",
-                        "Medium"
-                ));
+                        "Medium"));
             }
         }
 

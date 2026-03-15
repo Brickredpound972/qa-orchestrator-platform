@@ -27,6 +27,9 @@ public class QaAnalysisResult {
     private String frameworkSuggestion;
     private String analysisSummary;
     private RequirementStageArtifact requirementStage;
+    private TestDesignStageArtifact testDesignStage;
+    private RiskStageArtifact riskStage;
+    private AutomationStageArtifact automationStage;
 
     public QaAnalysisResult() {
     }
@@ -213,5 +216,29 @@ public class QaAnalysisResult {
 
     public void setRequirementStage(RequirementStageArtifact requirementStage) {
         this.requirementStage = requirementStage;
+    }
+
+    public TestDesignStageArtifact getTestDesignStage() {
+        return testDesignStage;
+    }
+
+    public void setTestDesignStage(TestDesignStageArtifact testDesignStage) {
+        this.testDesignStage = testDesignStage;
+    }
+
+    public RiskStageArtifact getRiskStage() {
+        return riskStage;
+    }
+
+    public void setRiskStage(RiskStageArtifact riskStage) {
+        this.riskStage = riskStage;
+    }
+
+    public AutomationStageArtifact getAutomationStage() {
+        return automationStage;
+    }
+
+    public void setAutomationStage(AutomationStageArtifact automationStage) {
+        this.automationStage = automationStage;
     }
 }

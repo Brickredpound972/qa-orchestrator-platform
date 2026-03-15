@@ -1,6 +1,7 @@
 package com.qa.qa_orchestrator_service.service.stage;
 
 import com.qa.qa_orchestrator_service.model.QaAnalysisResult;
+import com.qa.qa_orchestrator_service.model.RiskStageArtifact;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -13,13 +14,27 @@ public class RiskAnalysisStage {
         String rawRiskLevel = extractSingleValue(raw, "Risk Level:");
         String riskReason = extractSingleValue(raw, "Reason:");
         int riskScore = calculateRiskScore(raw, rawRiskLevel);
+        List<String> topRiskDrivers = buildTopRiskDrivers(raw);
+        String rawReleaseRecommendation = extractSingleValue(raw, "Release Recommendation:");
+        String releaseRecommendation = mapReleaseRecommendation(riskScore);
+        String resolvedRiskLevel = mapRiskLevel(riskScore, rawRiskLevel);
 
         result.setRiskScore(riskScore);
-        result.setRiskLevel(mapRiskLevel(riskScore, rawRiskLevel));
+        result.setRiskLevel(resolvedRiskLevel);
         result.setRiskReason(riskReason);
-        result.setTopRiskDrivers(buildTopRiskDrivers(raw));
-        result.setRawReleaseRecommendation(extractSingleValue(raw, "Release Recommendation:"));
-        result.setReleaseRecommendation(mapReleaseRecommendation(riskScore));
+        result.setTopRiskDrivers(topRiskDrivers);
+        result.setRawReleaseRecommendation(rawReleaseRecommendation);
+        result.setReleaseRecommendation(releaseRecommendation);
+
+        RiskStageArtifact artifact = new RiskStageArtifact();
+        artifact.setRiskScore(riskScore);
+        artifact.setRiskLevel(resolvedRiskLevel);
+        artifact.setRiskReason(riskReason);
+        artifact.setTopRiskDrivers(topRiskDrivers);
+        artifact.setRawReleaseRecommendation(rawReleaseRecommendation);
+        artifact.setReleaseRecommendation(releaseRecommendation);
+
+        result.setRiskStage(artifact);
     }
 
     private String extractSingleValue(String raw, String prefix) {
