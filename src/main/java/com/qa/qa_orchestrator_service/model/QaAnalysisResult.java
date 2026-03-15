@@ -26,6 +26,7 @@ public class QaAnalysisResult {
     private String coverageSplit;
     private String frameworkSuggestion;
     private String analysisSummary;
+    private RequirementStageArtifact requirementStage;
 
     public QaAnalysisResult() {
     }
@@ -204,5 +205,13 @@ public class QaAnalysisResult {
 
     public void setAnalysisSummary(String analysisSummary) {
         this.analysisSummary = analysisSummary;
+    }
+
+    public RequirementStageArtifact getRequirementStage() {
+        return requirementStage;
+    }
+
+    public void setRequirementStage(RequirementStageArtifact requirementStage) {
+        this.requirementStage = requirementStage;
     }
 }

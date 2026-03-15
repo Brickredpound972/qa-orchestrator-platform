@@ -2,6 +2,7 @@ package com.qa.qa_orchestrator_service.service.stage;
 
 import com.qa.qa_orchestrator_service.model.QaAnalysisResult;
 import org.springframework.stereotype.Component;
+import com.qa.qa_orchestrator_service.model.RequirementStageArtifact;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -10,13 +11,32 @@ import java.util.List;
 public class RequirementAnalysisStage {
 
     public void apply(QaAnalysisResult result, String raw) {
-        result.setRequirementStatus(extractStatus(raw));
-        result.setFeatureSummary(buildFeatureSummary(raw));
-        result.setClarifiedRequirements(buildClarifiedRequirements(raw));
-        result.setEdgeCases(buildEdgeCases(raw));
-        result.setOpenQuestions(buildOpenQuestions(raw));
-        result.setScope(buildScope(raw));
-        result.setOutOfScope(buildOutOfScope(raw));
+        String status = extractStatus(raw);
+        String featureSummary = buildFeatureSummary(raw);
+        List<String> clarifiedRequirements = buildClarifiedRequirements(raw);
+        List<String> edgeCases = buildEdgeCases(raw);
+        List<String> openQuestions = buildOpenQuestions(raw);
+        List<String> scope = buildScope(raw);
+        List<String> outOfScope = buildOutOfScope(raw);
+
+        result.setRequirementStatus(status);
+        result.setFeatureSummary(featureSummary);
+        result.setClarifiedRequirements(clarifiedRequirements);
+        result.setEdgeCases(edgeCases);
+        result.setOpenQuestions(openQuestions);
+        result.setScope(scope);
+        result.setOutOfScope(outOfScope);
+
+        RequirementStageArtifact artifact = new RequirementStageArtifact();
+        artifact.setStatus(status);
+        artifact.setFeatureSummary(featureSummary);
+        artifact.setClarifiedRequirements(clarifiedRequirements);
+        artifact.setEdgeCases(edgeCases);
+        artifact.setOpenQuestions(openQuestions);
+        artifact.setScope(scope);
+        artifact.setOutOfScope(outOfScope);
+
+        result.setRequirementStage(artifact);
     }
 
     private String extractStatus(String raw) {
