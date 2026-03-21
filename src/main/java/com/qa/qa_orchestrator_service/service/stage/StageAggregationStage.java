@@ -4,6 +4,12 @@ import com.qa.qa_orchestrator_service.model.QaAnalysisResult;
 import com.qa.qa_orchestrator_service.model.QaStagesArtifact;
 import org.springframework.stereotype.Component;
 
+/**
+ * StageAggregationStage
+ *
+ * Collects all stage artifacts into the canonical analysis.stages object.
+ * Always runs last in the pipeline.
+ */
 @Component
 public class StageAggregationStage {
 
@@ -13,6 +19,7 @@ public class StageAggregationStage {
         stages.setTestDesign(result.getTestDesignStage());
         stages.setAutomation(result.getAutomationStage());
         stages.setRisk(result.getRiskStage());
+        stages.setBugReport(result.getBugReportStage());
 
         result.setStages(stages);
     }

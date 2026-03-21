@@ -1,30 +1,27 @@
-# QA Orchestrator Platform - API Contract
+# QA Orchestrator Platform — API Contract
 
 ## Overview
 
 This document defines the API contract for the QA Orchestrator Platform.
 
-The platform analyzes Jira issues and produces structured QA outputs including:
+The platform analyzes Jira issues and produces structured QA outputs across 5 LLM-powered stages:
 
 - Requirement analysis
 - Test design
-- Automation recommendation
+- Automation decision
 - Risk evaluation
-- Release recommendation
+- Bug report template
 
-The current canonical response contract version is:
-
-v2
+Current contract version: **v2**
 
 ---
 
 ## Base URL
 
-### Production
-https://qa-orchestrator-service.onrender.com
-
-### Local
-http://localhost:10000
+| Environment | URL |
+|-------------|-----|
+| Production | https://qa-orchestrator-service.onrender.com |
+| Local | http://localhost:10000 |
 
 ---
 
@@ -34,70 +31,62 @@ http://localhost:10000
 
 Analyzes a Jira issue and returns structured QA insights.
 
-### Request Headers
-
+**Request Headers**
+```
 Content-Type: application/json
+```
 
-### Request Body
-
+**Request Body**
+```json
 {
   "issueKey": "PROJ-4"
 }
+```
 
-### Request Fields
-
-| Field    | Type   | Required | Description               |
-|---------|--------|---------|---------------------------|
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
 | issueKey | string | Yes | Jira issue key to analyze |
 
 ---
 
 ## Response Structure
 
-### Top-Level Response
-
+```json
 {
-  "output": "QA Orchestrator Analysis...",
+  "output": "Requirement status: READY. Automation: Hybrid. Risk: MEDIUM (60). Release decision: Caution.",
   "analysis": {
     "contractVersion": "v2",
     "traceabilityId": "PROJ-4",
-    "analysisSummary": "Requirement status: READY. Automation: Hybrid (UI + API). Risk: HIGH (70). Release decision: Block.",
-    "rawOutput": "QA Orchestrator Analysis...",
+    "analysisSummary": "Requirement status: READY. Automation: Hybrid. Risk: MEDIUM (60). Release decision: Caution.",
     "stages": {
       "requirement": {},
       "testDesign": {},
       "automation": {},
-      "risk": {}
+      "risk": {},
+      "bugReport": {}
     }
   }
 }
-
-### Top-Level Fields
+```
 
 | Field | Type | Description |
-|------|------|-------------|
-| output | string | Human-readable QA analysis output |
+|-------|------|-------------|
+| output | string | Human-readable summary line |
 | analysis | object | Structured QA analysis object |
+| analysis.contractVersion | string | Contract version (currently v2) |
+| analysis.traceabilityId | string | Jira issue key |
+| analysis.analysisSummary | string | One-line QA decision summary |
+| analysis.stages | object | Canonical stage output — primary consumer path |
 
 ---
 
-## Analysis Object
+## Canonical Path
 
-### Canonical Fields
+All structured output lives under:
 
-| Field | Type | Description |
-|------|------|-------------|
-| contractVersion | string | Response contract version |
-| traceabilityId | string | Traceability identifier (Jira issue key) |
-| analysisSummary | string | High-level summary of QA decision |
-| rawOutput | string | Raw orchestrator output |
-| stages | object | Canonical stage-based analysis output |
-
-### Canonical Path
-
-Primary structured response location:
-
+```
 analysis.stages
+```
 
 ---
 
@@ -107,235 +96,253 @@ analysis.stages
 
 ## Requirement Stage
 
-Path:
+Path: `analysis.stages.requirement`
 
-analysis.stages.requirement
-
-Example:
-
+```json
 {
   "status": "READY",
-  "featureSummary": "Coupon validation and application behavior during checkout.",
+  "featureSummary": "Apply a coupon code during checkout to receive a discount.",
   "clarifiedRequirements": [
-    "User can enter and apply a coupon code during checkout.",
-    "Coupon input must be validated before discount is applied.",
-    "Only one coupon can be applied per checkout session.",
-    "Applied coupon state must persist within the same session."
+    "User can enter a coupon code in the coupon field.",
+    "Valid coupon applies discount to subtotal before tax.",
+    "Invalid coupon displays error message.",
+    "Only one coupon can be active at a time."
   ],
   "edgeCases": [
-    "Invalid coupon code is entered.",
-    "User attempts to apply a second coupon after one is already active.",
-    "Discount affects subtotal before tax calculation.",
-    "Coupon remains applied after refresh within the same session."
+    "Empty coupon code field submitted.",
+    "Expired coupon code entered.",
+    "Coupon code with maximum usage limit reached."
   ],
   "openQuestions": [
-    "Should expired coupons be rejected with a specific validation message?",
-    "Is coupon stacking always disallowed, or only for this checkout flow?"
+    "What is the format of a valid coupon code?",
+    "How does the system handle different discount types?"
   ],
   "scope": [
-    "Coupon entry and application flow",
-    "Coupon validation behavior",
-    "Single coupon enforcement"
+    "Coupon code field on the checkout page",
+    "Discount application to subtotal before tax"
   ],
   "outOfScope": [
-    "Cross-device persistence",
-    "Coupon management admin flows",
-    "Promotion creation and configuration"
+    "Coupon code generation and management",
+    "Integration with third-party coupon services"
   ]
 }
-
-### Requirement Fields
+```
 
 | Field | Type | Description |
-|------|------|-------------|
-| status | string | Requirement readiness status |
-| featureSummary | string | Feature summary |
-| clarifiedRequirements | string[] | Extracted testable requirements |
-| edgeCases | string[] | Edge case scenarios |
-| openQuestions | string[] | Missing requirement questions |
-| scope | string[] | Functional scope |
-| outOfScope | string[] | Explicit exclusions |
+|-------|------|-------------|
+| status | string | READY or BLOCKED |
+| featureSummary | string | One-sentence feature description |
+| clarifiedRequirements | string[] | Testable requirements extracted from ticket |
+| edgeCases | string[] | Boundary and negative scenarios |
+| openQuestions | string[] | Gaps that could block test execution |
+| scope | string[] | In-scope system areas |
+| outOfScope | string[] | Explicitly excluded areas |
 
 ---
 
 ## Test Design Stage
 
-Path:
+Path: `analysis.stages.testDesign`
 
-analysis.stages.testDesign
-
-Example:
-
+```json
 {
   "testScenarios": [
-    "Valid coupon",
-    "Invalid coupon",
-    "Multiple coupon restriction",
-    "Subtotal before tax",
-    "Session persistence"
+    "Valid Coupon Application",
+    "Invalid Coupon Handling",
+    "Expired Coupon",
+    "Empty Field Submission",
+    "Multiple Coupon Restriction"
   ],
   "testCases": [
     {
       "id": "TC-01",
-      "title": "Validate valid coupon application",
-      "preconditions": "User has items in cart",
+      "title": "Apply Valid Coupon Code",
+      "preconditions": "User is on checkout page with items in cart",
       "steps": [
-        "Open checkout",
-        "Enter valid coupon",
-        "Apply coupon"
+        "Enter valid coupon code in coupon field",
+        "Click apply button",
+        "Verify discount applied to subtotal"
       ],
-      "expectedResult": "Coupon applied successfully",
+      "expectedResult": "Discount applied, order total updated",
       "testType": "UI",
       "suiteTag": "Smoke",
-      "testData": "Valid coupon",
+      "testData": "Valid coupon code: SAVE10",
       "priority": "High"
     }
   ]
 }
-
-### Test Case Fields
+```
 
 | Field | Type | Description |
-|------|------|-------------|
-| id | string | Test case ID |
-| title | string | Test case title |
-| preconditions | string | Preconditions |
-| steps | string[] | Execution steps |
-| expectedResult | string | Expected outcome |
-| testType | string | UI / API / E2E |
-| suiteTag | string | Smoke / Regression |
-| testData | string | Test data |
-| priority | string | Priority |
+|-------|------|-------------|
+| testScenarios | string[] | High-level test scenario names |
+| testCases | object[] | Structured, execution-ready test cases |
+| testCases[].id | string | Test case ID (TC-01, TC-02...) |
+| testCases[].title | string | Descriptive test case title |
+| testCases[].preconditions | string | Required state before test runs |
+| testCases[].steps | string[] | Step-by-step execution instructions |
+| testCases[].expectedResult | string | Verifiable expected outcome |
+| testCases[].testType | string | UI / API / E2E |
+| testCases[].suiteTag | string | Smoke / Regression |
+| testCases[].testData | string | Specific test data used |
+| testCases[].priority | string | High / Medium / Low |
 
 ---
 
 ## Automation Stage
 
-Path:
+Path: `analysis.stages.automation`
 
-analysis.stages.automation
-
-Example:
-
+```json
 {
-  "automationRecommendation": "Hybrid (UI + API)",
-  "automationReasoning": "Checkout UI validation and API rule enforcement required",
-  "coverageSplit": "UI 60% / API 40%",
-  "frameworkSuggestion": "Java + Selenium + TestNG + REST Assured"
+  "automationRecommendation": "Automation (UI-heavy)",
+  "automationReasoning": "The feature is primarily user-facing with no backend API test cases generated.",
+  "coverageSplit": "UI 100% / API 0%",
+  "frameworkSuggestion": "Selenium + TestNG (Java) or Playwright (TypeScript)"
 }
-
-### Automation Fields
+```
 
 | Field | Type | Description |
-|------|------|-------------|
-| automationRecommendation | string | Automation strategy |
-| automationReasoning | string | Explanation |
-| coverageSplit | string | UI/API coverage |
-| frameworkSuggestion | string | Suggested framework |
+|-------|------|-------------|
+| automationRecommendation | string | Manual / UI-heavy / API-heavy / Hybrid |
+| automationReasoning | string | Explanation of the strategy choice |
+| coverageSplit | string | UI vs API percentage |
+| frameworkSuggestion | string | Recommended test framework |
 
 ---
 
 ## Risk Stage
 
-Path:
+Path: `analysis.stages.risk`
 
-analysis.stages.risk
-
-Example:
-
+```json
 {
-  "riskScore": 70,
-  "riskLevel": "HIGH",
-  "riskReason": "Checkout flow, financial impact",
+  "riskScore": 60,
+  "riskLevel": "MEDIUM",
+  "riskReason": "Feature impacts critical checkout path with financial implications.",
   "topRiskDrivers": [
-    "Checkout flow",
-    "Financial impact"
+    "Impact on critical user path (checkout)",
+    "Financial impacts (discount calculation)",
+    "Unresolved open questions affecting test coverage"
   ],
-  "releaseRecommendation": "Block"
+  "releaseRecommendation": "Caution"
 }
-
-### Risk Fields
+```
 
 | Field | Type | Description |
-|------|------|-------------|
-| riskScore | integer | Risk score |
+|-------|------|-------------|
+| riskScore | integer | 0–100 risk score |
 | riskLevel | string | LOW / MEDIUM / HIGH |
-| riskReason | string | Risk explanation |
-| topRiskDrivers | string[] | Major drivers |
-| releaseRecommendation | string | Release decision |
+| riskReason | string | One-sentence risk explanation |
+| topRiskDrivers | string[] | Key risk contributors |
+| releaseRecommendation | string | Go / Caution / Block |
 
 ---
 
-# Compatibility Fields
+## Bug Report Stage
 
-The response retains flat analysis fields for backward compatibility.
+Path: `analysis.stages.bugReport`
 
-Examples:
+```json
+{
+  "title": "Coupon Code Application Failure During Checkout",
+  "environment": "QA / Staging",
+  "severity": "Medium",
+  "priority": "P3",
+  "reproductionSteps": [
+    "Navigate to checkout page with items in cart",
+    "Enter a valid coupon code in the coupon field",
+    "Click the apply button",
+    "Observe the result"
+  ],
+  "expectedResult": "Discount applied to subtotal, order total updated.",
+  "actualResult": "To be filled by QA engineer after test execution.",
+  "impactSummary": "Incorrect discounts could cause financial loss and poor user experience.",
+  "affectedAreas": [
+    "Coupon code field on checkout page",
+    "Discount calculation logic",
+    "Order total display"
+  ],
+  "suggestedAssignee": "Backend Developer"
+}
+```
 
-- analysis.requirementStatus
-- analysis.featureSummary
-- analysis.automationRecommendation
-- analysis.riskLevel
-- analysis.riskScore
-- analysis.releaseRecommendation
-- analysis.clarifiedRequirements
-- analysis.edgeCases
-- analysis.testScenarios
-- analysis.testCases
+| Field | Type | Description |
+|-------|------|-------------|
+| title | string | Descriptive bug report title |
+| environment | string | Target test environment |
+| severity | string | Critical / High / Medium / Low |
+| priority | string | P1 / P2 / P3 / P4 |
+| reproductionSteps | string[] | Steps to reproduce the defect |
+| expectedResult | string | What should happen |
+| actualResult | string | What actually happened (filled by QA) |
+| impactSummary | string | Business impact if bug exists |
+| affectedAreas | string[] | System components at risk |
+| suggestedAssignee | string | Recommended assignee role |
 
-Legacy stage aliases are also present:
+---
 
-- analysis.requirementStage
-- analysis.testDesignStage
-- analysis.automationStage
-- analysis.riskStage
+# Backward Compatibility Fields
 
-These exist only for compatibility.
+Top-level flat fields are retained for earlier integrations:
 
-Canonical consumers should rely on:
+- `analysis.requirementStatus`
+- `analysis.featureSummary`
+- `analysis.automationRecommendation`
+- `analysis.riskLevel`
+- `analysis.riskScore`
+- `analysis.releaseRecommendation`
+- `analysis.clarifiedRequirements`
+- `analysis.edgeCases`
+- `analysis.testScenarios`
+- `analysis.testCases`
 
-analysis.stages
+Legacy stage aliases also present:
+
+- `analysis.requirementStage`
+- `analysis.testDesignStage`
+- `analysis.automationStage`
+- `analysis.riskStage`
+- `analysis.bugReportStage`
+
+These exist only for compatibility. Canonical consumers should use `analysis.stages`.
 
 ---
 
 # Contract Versioning
 
-Current version:
-
-v2
-
-Rules:
-
-- Breaking changes require a new version
-- New fields may be added without breaking compatibility
-- Canonical consumers should use `analysis.stages`
+| Rule | Description |
+|------|-------------|
+| Breaking changes | Require new contract version |
+| New fields | Can be added without version bump |
+| Canonical path | Always `analysis.stages` |
 
 ---
 
 # Local Testing
 
-Start service:
-
+```bash
 export JIRA_BASE_URL=https://your-domain.atlassian.net
 export JIRA_EMAIL=your-email@example.com
 export JIRA_API_TOKEN=your-jira-api-token
+export GROQ_API_KEY=gsk_...
 
 ./mvnw spring-boot:run
+```
 
-Test:
-
+```bash
 curl -X POST http://localhost:10000/qa/api/v1/qa/analyze \
 -H "Content-Type: application/json" \
 -d '{"issueKey":"PROJ-4"}'
+```
 
 ---
 
-# Notes
-
-This contract supports:
+# Supported Integrations
 
 - QA workflow orchestration
 - AI-assisted test planning
-- release decision support
-- Copilot integrations
-- dashboard visualization
+- Release decision support
+- Microsoft Copilot Studio
+- Power Automate
+- Dashboard visualization

@@ -1,165 +1,123 @@
 package com.qa.qa_orchestrator_service.service.stage;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.qa.qa_orchestrator_service.service.llm.GroqClient;
 import com.qa.qa_orchestrator_service.model.QaAnalysisResult;
-import org.springframework.stereotype.Component;
 import com.qa.qa_orchestrator_service.model.RequirementStageArtifact;
+import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * RequirementAnalysisStage — LLM-powered (Groq)
+ *
+ * Replaces keyword matching with real AI reasoning.
+ */
 @Component
 public class RequirementAnalysisStage {
 
-    public void apply(QaAnalysisResult result, String raw) {
-        String status = extractStatus(raw);
-        String featureSummary = buildFeatureSummary(raw);
-        List<String> clarifiedRequirements = buildClarifiedRequirements(raw);
-        List<String> edgeCases = buildEdgeCases(raw);
-        List<String> openQuestions = buildOpenQuestions(raw);
-        List<String> scope = buildScope(raw);
-        List<String> outOfScope = buildOutOfScope(raw);
+    private static final String SYSTEM_PROMPT = """
+            You are a senior QA engineer performing requirement analysis on a Jira issue.
 
-        result.setRequirementStatus(status);
-        result.setFeatureSummary(featureSummary);
-        result.setClarifiedRequirements(clarifiedRequirements);
-        result.setEdgeCases(edgeCases);
-        result.setOpenQuestions(openQuestions);
-        result.setScope(scope);
-        result.setOutOfScope(outOfScope);
+            Your job is to analyze the provided Jira issue and return a structured JSON object.
 
-        RequirementStageArtifact artifact = new RequirementStageArtifact();
-        artifact.setStatus(status);
-        artifact.setFeatureSummary(featureSummary);
-        artifact.setClarifiedRequirements(clarifiedRequirements);
-        artifact.setEdgeCases(edgeCases);
-        artifact.setOpenQuestions(openQuestions);
-        artifact.setScope(scope);
-        artifact.setOutOfScope(outOfScope);
+            RULES:
+            - Return ONLY valid JSON. No markdown, no explanation, no code blocks.
+            - If the issue lacks enough detail to test (missing acceptance criteria, missing feature behavior,
+              missing scope), set status to "BLOCKED".
+            - If the issue is sufficiently clear, set status to "READY".
+            - Be specific and concrete. Do not invent requirements not present in the issue.
+            - edgeCases must include boundary conditions, invalid inputs, and state-related edge cases.
+            - openQuestions must be real gaps that would block test execution.
 
+            REQUIRED JSON STRUCTURE:
+            {
+              "status": "READY" or "BLOCKED",
+              "featureSummary": "one sentence description of what is being tested",
+              "clarifiedRequirements": ["requirement 1", "requirement 2"],
+              "edgeCases": ["edge case 1", "edge case 2"],
+              "openQuestions": ["question 1", "question 2"],
+              "scope": ["in-scope item 1", "in-scope item 2"],
+              "outOfScope": ["out-of-scope item 1", "out-of-scope item 2"]
+            }
+            """;
+
+    private final GroqClient groqClient;
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    public RequirementAnalysisStage(GroqClient groqClient) {
+        this.groqClient = groqClient;
+    }
+
+    public void apply(QaAnalysisResult result, String jiraIssueJson) {
+        try {
+            String groqResponse = groqClient.call(SYSTEM_PROMPT, jiraIssueJson);
+            RequirementStageArtifact artifact = parseResponse(groqResponse);
+            applyToResult(result, artifact);
+
+        } catch (Exception e) {
+            RequirementStageArtifact fallback = buildFallbackArtifact(e.getMessage());
+            applyToResult(result, fallback);
+        }
+    }
+
+    private RequirementStageArtifact parseResponse(String raw) {
+        try {
+            String cleaned = raw
+                    .replaceAll("(?s)```json\\s*", "")
+                    .replaceAll("(?s)```\\s*", "")
+                    .trim();
+
+            JsonNode node = objectMapper.readTree(cleaned);
+
+            RequirementStageArtifact artifact = new RequirementStageArtifact();
+            artifact.setStatus(node.path("status").asText("UNKNOWN"));
+            artifact.setFeatureSummary(node.path("featureSummary").asText(""));
+            artifact.setClarifiedRequirements(toStringList(node.path("clarifiedRequirements")));
+            artifact.setEdgeCases(toStringList(node.path("edgeCases")));
+            artifact.setOpenQuestions(toStringList(node.path("openQuestions")));
+            artifact.setScope(toStringList(node.path("scope")));
+            artifact.setOutOfScope(toStringList(node.path("outOfScope")));
+
+            return artifact;
+
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to parse Groq requirement response: " + e.getMessage(), e);
+        }
+    }
+
+    private void applyToResult(QaAnalysisResult result, RequirementStageArtifact artifact) {
+        result.setRequirementStatus(artifact.getStatus());
+        result.setFeatureSummary(artifact.getFeatureSummary());
+        result.setClarifiedRequirements(artifact.getClarifiedRequirements());
+        result.setEdgeCases(artifact.getEdgeCases());
+        result.setOpenQuestions(artifact.getOpenQuestions());
+        result.setScope(artifact.getScope());
+        result.setOutOfScope(artifact.getOutOfScope());
         result.setRequirementStage(artifact);
     }
 
-    private String extractStatus(String raw) {
-        if (raw != null && raw.contains("Requirement Analysis: READY")) {
-            return "READY";
-        }
-        if (raw != null && raw.contains("Requirement Analysis: BLOCKED")) {
-            return "BLOCKED";
-        }
-        return "UNKNOWN";
+    private RequirementStageArtifact buildFallbackArtifact(String errorMessage) {
+        RequirementStageArtifact artifact = new RequirementStageArtifact();
+        artifact.setStatus("BLOCKED");
+        artifact.setFeatureSummary("Requirement analysis failed due to LLM error.");
+        artifact.setClarifiedRequirements(List.of());
+        artifact.setEdgeCases(List.of());
+        artifact.setOpenQuestions(List.of("LLM call failed: " + errorMessage));
+        artifact.setScope(List.of());
+        artifact.setOutOfScope(List.of());
+        return artifact;
     }
 
-    private String buildFeatureSummary(String raw) {
-        String lower = raw == null ? "" : raw.toLowerCase();
-
-        if (lower.contains("coupon") && lower.contains("checkout")) {
-            return "Coupon validation and application behavior during checkout.";
-        }
-        if (lower.contains("coupon")) {
-            return "Coupon application and validation flow.";
-        }
-        if (lower.contains("checkout")) {
-            return "Checkout-related validation and session behavior.";
-        }
-
-        return "QA analysis generated from available issue context.";
-    }
-
-    private List<String> buildClarifiedRequirements(String raw) {
+    private List<String> toStringList(JsonNode arrayNode) {
         List<String> items = new ArrayList<>();
-        String lower = raw == null ? "" : raw.toLowerCase();
-
-        if (lower.contains("coupon")) {
-            items.add("User can enter and apply a coupon code during checkout.");
+        if (arrayNode.isArray()) {
+            for (JsonNode item : arrayNode) {
+                items.add(item.asText());
+            }
         }
-        if (lower.contains("validation")) {
-            items.add("Coupon input must be validated before discount is applied.");
-        }
-        if (lower.contains("single coupon")
-                || lower.contains("multiple coupon")
-                || lower.contains("one coupon")) {
-            items.add("Only one coupon can be applied per checkout session.");
-        }
-        if (lower.contains("session persistence")
-                || lower.contains("same session")
-                || lower.contains("session")) {
-            items.add("Applied coupon state must persist within the same session.");
-        }
-
-        return items;
-    }
-
-    private List<String> buildEdgeCases(String raw) {
-        List<String> items = new ArrayList<>();
-        String lower = raw == null ? "" : raw.toLowerCase();
-
-        if (lower.contains("invalid coupon")) {
-            items.add("Invalid coupon code is entered.");
-        }
-        if (lower.contains("multiple coupon")) {
-            items.add("User attempts to apply a second coupon after one is already active.");
-        }
-        if (lower.contains("subtotal")) {
-            items.add("Discount affects subtotal before tax calculation.");
-        }
-        if (lower.contains("session")) {
-            items.add("Coupon remains applied after refresh within the same session.");
-        }
-
-        return items;
-    }
-
-    private List<String> buildOpenQuestions(String raw) {
-        List<String> items = new ArrayList<>();
-        String lower = raw == null ? "" : raw.toLowerCase();
-
-        if (!lower.contains("expiry") && lower.contains("coupon")) {
-            items.add("Should expired coupons be rejected with a specific validation message?");
-        }
-
-        if (!lower.contains("stack") && lower.contains("coupon")) {
-            items.add("Is coupon stacking always disallowed, or only for this checkout flow?");
-        }
-
-        if (!lower.contains("guest") && lower.contains("checkout")) {
-            items.add("Does the coupon behavior differ for guest and authenticated users?");
-        }
-
-        if (!lower.contains("currency") && (lower.contains("subtotal") || lower.contains("discount"))) {
-            items.add("Are there any currency, rounding, or localization rules affecting subtotal calculation?");
-        }
-
-        return items;
-    }
-
-    private List<String> buildScope(String raw) {
-        List<String> items = new ArrayList<>();
-        String lower = raw == null ? "" : raw.toLowerCase();
-
-        if (lower.contains("coupon")) {
-            items.add("Coupon entry and application flow");
-        }
-        if (lower.contains("validation")) {
-            items.add("Coupon validation behavior");
-        }
-        if (lower.contains("multiple coupon")) {
-            items.add("Single coupon enforcement");
-        }
-        if (lower.contains("subtotal")) {
-            items.add("Discount impact on subtotal before tax");
-        }
-        if (lower.contains("session")) {
-            items.add("Same-session coupon persistence");
-        }
-
-        return items;
-    }
-
-    private List<String> buildOutOfScope(String raw) {
-        List<String> items = new ArrayList<>();
-        items.add("Cross-device persistence");
-        items.add("Coupon management admin flows");
-        items.add("Promotion creation and configuration");
         return items;
     }
 }

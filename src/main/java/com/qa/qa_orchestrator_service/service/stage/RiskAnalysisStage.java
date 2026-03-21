@@ -1,5 +1,8 @@
 package com.qa.qa_orchestrator_service.service.stage;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.qa.qa_orchestrator_service.service.llm.GroqClient;
 import com.qa.qa_orchestrator_service.model.QaAnalysisResult;
 import com.qa.qa_orchestrator_service.model.RiskStageArtifact;
 import org.springframework.stereotype.Component;
@@ -7,126 +10,197 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * RiskAnalysisStage — LLM-powered
+ *
+ * Takes the full pipeline context (requirements + test cases + open questions)
+ * and produces a structured risk evaluation with a numeric score.
+ *
+ * KEY LESSON:
+ * This stage reads from ALL previous stages.
+ * Risk cannot be calculated in isolation — it depends on:
+ *   - what the feature does (requirement stage)
+ *   - how many test cases were needed (test design stage)
+ *   - what questions remain open (requirement stage)
+ *
+ * The LLM reasons about all of this together, like a senior QA engineer would.
+ */
 @Component
 public class RiskAnalysisStage {
 
-    public void apply(QaAnalysisResult result, String raw) {
-        String rawRiskLevel = extractSingleValue(raw, "Risk Level:");
-        String riskReason = extractSingleValue(raw, "Reason:");
-        int riskScore = calculateRiskScore(raw, rawRiskLevel);
-        List<String> topRiskDrivers = buildTopRiskDrivers(raw);
-        String rawReleaseRecommendation = extractSingleValue(raw, "Release Recommendation:");
-        String releaseRecommendation = mapReleaseRecommendation(riskScore);
-        String resolvedRiskLevel = mapRiskLevel(riskScore, rawRiskLevel);
+    private static final String SYSTEM_PROMPT = """
+            You are a senior QA engineer performing release risk analysis.
 
-        result.setRiskScore(riskScore);
-        result.setRiskLevel(resolvedRiskLevel);
-        result.setRiskReason(riskReason);
-        result.setTopRiskDrivers(topRiskDrivers);
-        result.setRawReleaseRecommendation(rawReleaseRecommendation);
-        result.setReleaseRecommendation(releaseRecommendation);
+            You will receive a summary of a feature including its requirements, test cases, and open questions.
+            Your job is to evaluate the release risk and return a structured JSON object.
+
+            SCORING RULES:
+            Base Score = 0
+            Add +20 if feature impacts a critical user path (checkout, payment, login, authentication)
+            Add +15 if the feature is regression-sensitive or touches shared components
+            Add +10 if session or state persistence is involved
+            Add +15 if there are financial, billing, or calculation impacts
+            Add +10 if there are unresolved open questions that affect test coverage
+            Add +10 if the feature has more than 7 test cases (indicates complexity)
+            Add +15 if there are integration dependencies with external systems
+            Cap total at 100.
+
+            RISK MAPPING:
+            0-39   = LOW
+            40-69  = MEDIUM
+            70-100 = HIGH
+
+            RELEASE MAPPING:
+            LOW    = Go
+            MEDIUM = Caution
+            HIGH   = Block
+
+            RULES:
+            - Return ONLY valid JSON. No markdown, no explanation, no code blocks.
+            - riskScore must be an integer between 0 and 100.
+            - topRiskDrivers must be specific reasons, not generic labels.
+            - mitigationSteps must be actionable QA recommendations.
+
+            REQUIRED JSON STRUCTURE:
+            {
+              "riskScore": 75,
+              "riskLevel": "HIGH",
+              "riskReason": "one sentence summarizing the main risk",
+              "topRiskDrivers": ["driver 1", "driver 2", "driver 3"],
+              "mitigationSteps": ["action 1", "action 2"],
+              "releaseRecommendation": "Block"
+            }
+            """;
+
+    private final GroqClient groqClient;
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    public RiskAnalysisStage(GroqClient groqClient) {
+        this.groqClient = groqClient;
+    }
+
+    public void apply(QaAnalysisResult result, String raw) {
+        try {
+            String stageInput = buildStageInput(result);
+            String groqResponse = groqClient.call(SYSTEM_PROMPT, stageInput);
+            applyParsedResponse(result, groqResponse);
+
+        } catch (Exception e) {
+            applyFallback(result);
+            System.err.println("RiskAnalysisStage LLM error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Build risk analysis input from ALL previous stage outputs.
+     *
+     * This is intentional — risk cannot be assessed without context from:
+     * - what the feature does (requirements)
+     * - what needs to be tested (test cases)
+     * - what is still unknown (open questions)
+     */
+    private String buildStageInput(QaAnalysisResult result) {
+        StringBuilder input = new StringBuilder();
+
+        input.append("Feature Summary: ")
+             .append(safe(result.getFeatureSummary()))
+             .append("\n\n");
+
+        input.append("Requirement Status: ")
+             .append(safe(result.getRequirementStatus()))
+             .append("\n\n");
+
+        input.append("Clarified Requirements:\n");
+        appendList(input, result.getClarifiedRequirements());
+
+        input.append("\nEdge Cases:\n");
+        appendList(input, result.getEdgeCases());
+
+        input.append("\nOpen Questions (unresolved):\n");
+        appendList(input, result.getOpenQuestions());
+
+        input.append("\nScope:\n");
+        appendList(input, result.getScope());
+
+        int testCaseCount = result.getTestCases() != null ? result.getTestCases().size() : 0;
+        input.append("\nNumber of test cases generated: ").append(testCaseCount).append("\n");
+
+        return input.toString();
+    }
+
+    private void applyParsedResponse(QaAnalysisResult result, String raw) {
+        try {
+            String cleaned = raw
+                    .replaceAll("(?s)```json\\s*", "")
+                    .replaceAll("(?s)```\\s*", "")
+                    .trim();
+
+            JsonNode node = objectMapper.readTree(cleaned);
+
+            int riskScore = Math.min(node.path("riskScore").asInt(50), 100);
+            String riskLevel = node.path("riskLevel").asText("MEDIUM");
+            String riskReason = node.path("riskReason").asText("");
+            List<String> topRiskDrivers = toStringList(node.path("topRiskDrivers"));
+            List<String> mitigationSteps = toStringList(node.path("mitigationSteps"));
+            String releaseRecommendation = node.path("releaseRecommendation").asText("Caution");
+
+            result.setRiskScore(riskScore);
+            result.setRiskLevel(riskLevel);
+            result.setRiskReason(riskReason);
+            result.setTopRiskDrivers(topRiskDrivers);
+            result.setReleaseRecommendation(releaseRecommendation);
+
+            RiskStageArtifact artifact = new RiskStageArtifact();
+            artifact.setRiskScore(riskScore);
+            artifact.setRiskLevel(riskLevel);
+            artifact.setRiskReason(riskReason);
+            artifact.setTopRiskDrivers(topRiskDrivers);
+            artifact.setReleaseRecommendation(releaseRecommendation);
+
+            result.setRiskStage(artifact);
+
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to parse Groq risk response: " + e.getMessage(), e);
+        }
+    }
+
+    private void applyFallback(QaAnalysisResult result) {
+        result.setRiskScore(50);
+        result.setRiskLevel("MEDIUM");
+        result.setRiskReason("Risk analysis unavailable due to LLM error.");
+        result.setTopRiskDrivers(List.of("LLM error — manual review required"));
+        result.setReleaseRecommendation("Caution");
 
         RiskStageArtifact artifact = new RiskStageArtifact();
-        artifact.setRiskScore(riskScore);
-        artifact.setRiskLevel(resolvedRiskLevel);
-        artifact.setRiskReason(riskReason);
-        artifact.setTopRiskDrivers(topRiskDrivers);
-        artifact.setRawReleaseRecommendation(rawReleaseRecommendation);
-        artifact.setReleaseRecommendation(releaseRecommendation);
-
+        artifact.setRiskScore(50);
+        artifact.setRiskLevel("MEDIUM");
+        artifact.setRiskReason("Risk analysis unavailable due to LLM error.");
+        artifact.setTopRiskDrivers(List.of("LLM error — manual review required"));
+        artifact.setReleaseRecommendation("Caution");
         result.setRiskStage(artifact);
     }
 
-    private String extractSingleValue(String raw, String prefix) {
-        if (raw == null || prefix == null) {
-            return null;
+    private void appendList(StringBuilder sb, List<String> items) {
+        if (items != null && !items.isEmpty()) {
+            for (String item : items) {
+                sb.append("- ").append(item).append("\n");
+            }
+        } else {
+            sb.append("- None\n");
         }
+    }
 
-        String[] lines = raw.split("\\R");
-        for (String line : lines) {
-            if (line.trim().startsWith(prefix)) {
-                return line.replace(prefix, "").trim();
+    private String safe(String value) {
+        return value != null ? value : "Not available";
+    }
+
+    private List<String> toStringList(JsonNode arrayNode) {
+        List<String> items = new ArrayList<>();
+        if (arrayNode.isArray()) {
+            for (JsonNode item : arrayNode) {
+                items.add(item.asText());
             }
         }
-        return null;
-    }
-
-    private List<String> buildTopRiskDrivers(String raw) {
-        List<String> drivers = new ArrayList<>();
-
-        String reason = extractSingleValue(raw, "Reason:");
-        if (reason != null && !reason.isBlank()) {
-            String[] parts = reason.split(",");
-            for (String part : parts) {
-                String trimmed = part.trim();
-                if (!trimmed.isEmpty()) {
-                    drivers.add(trimmed);
-                }
-            }
-        }
-
-        return drivers;
-    }
-
-    private int calculateRiskScore(String raw, String rawRiskLevel) {
-        int score = 0;
-        String lower = raw == null ? "" : raw.toLowerCase();
-
-        if (lower.contains("checkout") || lower.contains("payment") || lower.contains("login")) {
-            score += 20;
-        }
-
-        if (lower.contains("regression")) {
-            score += 15;
-        }
-
-        if (lower.contains("session persistence") || lower.contains("session") || lower.contains("state")) {
-            score += 10;
-        }
-
-        if (lower.contains("financial impact")
-                || lower.contains("subtotal")
-                || lower.contains("tax")
-                || lower.contains("discount")
-                || lower.contains("coupon")) {
-            score += 15;
-        }
-
-        if (lower.contains("multiple coupon")
-                || lower.contains("restriction")
-                || lower.contains("validation")) {
-            score += 10;
-        }
-
-        if ("HIGH".equalsIgnoreCase(rawRiskLevel) && score < 70) {
-            score = 70;
-        } else if ("MEDIUM".equalsIgnoreCase(rawRiskLevel) && score < 40) {
-            score = 40;
-        }
-
-        return Math.min(score, 100);
-    }
-
-    private String mapRiskLevel(int riskScore, String fallbackLevel) {
-        if (riskScore >= 70) {
-            return "HIGH";
-        }
-        if (riskScore >= 40) {
-            return "MEDIUM";
-        }
-        if (riskScore >= 0) {
-            return "LOW";
-        }
-        return fallbackLevel != null ? fallbackLevel : "UNKNOWN";
-    }
-
-    private String mapReleaseRecommendation(int riskScore) {
-        if (riskScore >= 70) {
-            return "Block";
-        }
-        if (riskScore >= 40) {
-            return "Caution";
-        }
-        return "Go";
+        return items;
     }
 }

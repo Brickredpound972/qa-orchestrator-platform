@@ -4,230 +4,223 @@
 ![Spring Boot](https://img.shields.io/badge/SpringBoot-3-green)
 ![API](https://img.shields.io/badge/API-Live-brightgreen)
 ![Contract](https://img.shields.io/badge/Contract-v2-orange)
+![LLM](https://img.shields.io/badge/LLM-Groq%20%2F%20Claude-purple)
 
-**QA Orchestrator Platform** is an AI-powered QA decision and orchestration engine that analyzes Jira issues and generates structured QA insights including test strategies, automation recommendations, and release risk analysis.
+**QA Orchestrator Platform** is an AI-powered QA decision engine that analyzes Jira issues and produces structured QA intelligence — including requirement analysis, test cases, automation strategy, risk scoring, and bug report templates.
 
-The platform acts as a **QA decision engine**, helping engineering teams determine:
-
-- how a feature should be tested
-- what should be automated
-- what risks the change introduces
-- whether the feature is safe to release
-
-Instead of manually analyzing tickets, the system converts Jira issues into structured QA intelligence.
+Each stage is powered by a large language model (LLM). The system reasons about the feature like a senior QA engineer, not a keyword matcher.
 
 ---
 
-# Key Features
+## What It Does
 
-- Jira issue ingestion via REST API
-- Multi-stage QA analysis pipeline
-- Structured test scenario and test case generation
-- Automation strategy recommendation (UI / API / Hybrid)
-- Risk scoring and release recommendation
-- Versioned API response contract
-- Copilot Studio and Power Automate integration support
+Instead of manually analyzing a ticket, the system does this automatically:
+
+```
+Developer writes Jira ticket
+        ↓
+QA Orchestrator reads the ticket
+        ↓
+Requirement Analysis   → clarified requirements, edge cases, open questions
+        ↓
+Test Design            → test scenarios, structured test cases
+        ↓
+Automation Decision    → strategy, coverage split, framework recommendation
+        ↓
+Risk Analysis          → risk score, risk drivers, release recommendation
+        ↓
+Bug Report Template    → pre-filled bug report ready for QA engineer
+```
 
 ---
 
-# System Architecture
+## System Architecture
 
-The platform integrates with enterprise workflow tools and processes Jira issues through a structured QA analysis pipeline.
 ```
 User / Copilot Studio / Power Automate
             │
-            v
+            ▼
       Custom Connector
             │
-            v
+            ▼
     QA Orchestrator API
             │
-            v
+            ▼
      Spring Boot Service
-            │
-            v
-        Jira REST API
+       │           │
+       ▼           ▼
+  Jira REST API   Groq LLM API
 ```
-The system retrieves Jira issue data and executes a multi-stage QA pipeline to generate testing artifacts and release risk analysis.
 
 ---
 
-# QA Analysis Pipeline
+## QA Analysis Pipeline
 
-Each Jira issue is processed through structured QA stages.
+All 5 stages are LLM-powered. Each stage reads from the previous stage output — they are not independent.
 
-## 1. Requirement Analysis
+### Stage 1 — Requirement Analysis
+Reads the raw Jira JSON. Produces:
+- `status` (READY / BLOCKED)
+- `featureSummary`
+- `clarifiedRequirements`
+- `edgeCases`
+- `openQuestions`
+- `scope` / `outOfScope`
 
-- Extracts testable requirements
-- Identifies missing information
-- Detects scope boundaries
-- Produces requirement-stage artifacts
+### Stage 2 — Test Design
+Reads clarified requirements and edge cases from Stage 1. Produces:
+- `testScenarios`
+- `testCases` (id, title, preconditions, steps, expectedResult, testType, suiteTag, testData, priority)
+
+### Stage 3 — Automation Decision
+Reads test case types (UI/API/E2E counts) and risk level. Produces:
+- `automationRecommendation` (Manual / UI-heavy / API-heavy / Hybrid)
+- `automationReasoning`
+- `coverageSplit`
+- `frameworkSuggestion`
+
+### Stage 4 — Risk Analysis
+Reads all previous stage outputs. Produces:
+- `riskScore` (0–100)
+- `riskLevel` (LOW / MEDIUM / HIGH)
+- `riskReason`
+- `topRiskDrivers`
+- `releaseRecommendation` (Go / Caution / Block)
+
+### Stage 5 — Bug Report
+Reads full pipeline context. Produces:
+- `title`
+- `severity` / `priority`
+- `reproductionSteps`
+- `expectedResult` / `actualResult`
+- `impactSummary`
+- `affectedAreas`
+- `suggestedAssignee`
 
 ---
 
-## 2. Test Design
+## Live API
 
-- Generates test scenarios
-- Produces structured test cases
-- Identifies edge cases
-- Produces test-design-stage artifacts
+Production endpoint:
 
----
-
-## 3. Automation Decision
-
-- Determines automation strategy
-- Suggests UI / API / Hybrid coverage
-- Recommends testing frameworks
-- Produces automation-stage artifacts
-
----
-
-## 4. Risk Analysis
-
-- Calculates feature risk score
-- Identifies major risk drivers
-- Provides release recommendation
-- Produces risk-stage artifacts
-
----
-
-# Live API
-
-Production endpoint
-
+```
 https://qa-orchestrator-service.onrender.com
+```
 
 ---
 
-# Example Request
+## Example Request
 
 ```bash
 curl -X POST https://qa-orchestrator-service.onrender.com/qa/api/v1/qa/analyze \
 -H "Content-Type: application/json" \
 -d '{"issueKey":"PROJ-4"}'
 ```
+
 ---
 
-# Example Response
+## Example Response (condensed)
 
 ```json
 {
-  "output": "QA Orchestrator Analysis...",
+  "output": "Requirement status: READY. Automation: Hybrid (UI + API). Risk: MEDIUM (60). Release decision: Caution.",
   "analysis": {
     "traceabilityId": "PROJ-4",
     "contractVersion": "v2",
-    "analysisSummary": "Requirement status: READY. Automation: Hybrid (UI + API). Risk: HIGH (70). Release decision: Block.",
-    "automationRecommendation": "Hybrid (UI + API)",
-    "riskLevel": "HIGH",
-    "riskScore": 70,
-    "releaseRecommendation": "Block",
+    "analysisSummary": "Requirement status: READY. Automation: Hybrid (UI + API). Risk: MEDIUM (60). Release decision: Caution.",
     "stages": {
       "requirement": {
         "status": "READY",
-        "featureSummary": "Coupon validation and application behavior during checkout."
+        "featureSummary": "Apply a coupon code during checkout to receive a discount on the order total.",
+        "clarifiedRequirements": ["Valid coupon applies discount to subtotal before tax", "..."],
+        "edgeCases": ["Expired coupon code", "Empty coupon field", "..."],
+        "openQuestions": ["What is the format of a valid coupon code?", "..."]
       },
       "testDesign": {
-        "testScenarios": [
-          "Valid coupon",
-          "Invalid coupon",
-          "Multiple coupon restriction"
+        "testScenarios": ["Valid Coupon Application", "Invalid Coupon", "..."],
+        "testCases": [
+          {
+            "id": "TC-01",
+            "title": "Apply Valid Coupon Code",
+            "steps": ["Enter valid coupon", "Click apply", "Verify discount"],
+            "expectedResult": "Discount applied to subtotal",
+            "testType": "UI",
+            "suiteTag": "Smoke",
+            "priority": "High"
+          }
         ]
       },
       "automation": {
-        "automationRecommendation": "Hybrid (UI + API)",
-        "coverageSplit": "UI 60% / API 40%"
+        "automationRecommendation": "Automation (UI-heavy)",
+        "coverageSplit": "UI 100% / API 0%",
+        "frameworkSuggestion": "Selenium + TestNG (Java) or Playwright (TypeScript)"
       },
       "risk": {
-        "riskScore": 70,
-        "riskLevel": "HIGH",
-        "releaseRecommendation": "Block"
+        "riskScore": 60,
+        "riskLevel": "MEDIUM",
+        "releaseRecommendation": "Caution"
+      },
+      "bugReport": {
+        "title": "Coupon Code Application Failure During Checkout",
+        "severity": "Medium",
+        "priority": "P3",
+        "reproductionSteps": ["Enter valid coupon", "Click apply", "Verify result"],
+        "expectedResult": "Discount applied correctly",
+        "actualResult": "To be filled by QA engineer after test execution.",
+        "suggestedAssignee": "Backend Developer"
       }
     }
   }
 }
 ```
----
-
-## API Contract
-
-The API returns a versioned response contract.
-
-Current contract version:
-v2
-
-Primary structured output is available under:
-analysis.stages
-
-Top-level fields remain as a compatibility layer for earlier consumers.
 
 ---
 
-## Purpose
+## API Endpoints
 
-Modern QA teams spend significant time answering questions such as:
-- How should this feature be tested?
-- What should be automated?
-- What risks does this change introduce?
-- Is this feature safe to release?
-
-QA Orchestrator automates this reasoning process by analyzing Jira issues and producing structured QA guidance.
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/qa/api/v1/qa/analyze` | Primary endpoint |
+| POST | `/qa/analyze` | Compatibility alias |
+| POST | `/qa/run/{issueKey}` | Legacy path endpoint |
 
 ---
 
 ## Tech Stack
 
-### Backend
-- Java 17
-- Spring Boot
-- Maven
-
-### Infrastructure
-- Docker
-- Render (Cloud Deployment)
-
-### Integrations
-- Jira REST API
-- Microsoft Copilot Studio
-- Power Automate
+| Layer | Technology |
+|-------|-----------|
+| Backend | Java 17, Spring Boot 3, Maven |
+| LLM | Groq API (Llama 3.3 70B) |
+| Infrastructure | Docker, Render |
+| Integrations | Jira REST API, Microsoft Copilot Studio, Power Automate |
 
 ---
 
-## Environment Setup
+## Environment Variables
 
-The application uses environment variables for Jira integration.
-
-Required variables:
-JIRA_BASE_URL
-JIRA_EMAIL
-JIRA_API_TOKEN
-
-Example:
-```bash
-JIRA_BASE_URL=https://your-domain.atlassian.net
-JIRA_EMAIL=your-email@example.com
-JIRA_API_TOKEN=your-jira-api-token
-```
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `JIRA_BASE_URL` | Yes | Jira instance URL |
+| `JIRA_EMAIL` | Yes | Jira account email |
+| `JIRA_API_TOKEN` | Yes | Jira API token |
+| `GROQ_API_KEY` | Yes | Groq API key |
 
 ---
 
 ## Local Development
 
-Export environment variables before starting the application.
-
-macOS / zsh
 ```bash
 export JIRA_BASE_URL=https://your-domain.atlassian.net
 export JIRA_EMAIL=your-email@example.com
 export JIRA_API_TOKEN=your-jira-api-token
-```
+export GROQ_API_KEY=gsk_...
 
-Run the application:
-```bash
 ./mvnw spring-boot:run
 ```
 
-Test locally:
+Test:
+
 ```bash
 curl -X POST http://localhost:10000/qa/api/v1/qa/analyze \
 -H "Content-Type: application/json" \
@@ -236,52 +229,29 @@ curl -X POST http://localhost:10000/qa/api/v1/qa/analyze \
 
 ---
 
-## Security Notes
-- Never commit credentials to the repository
-- Do not store secrets in source control
+## API Contract
+
+Current version: `v2`
+
+Primary structured output: `analysis.stages`
+
+Top-level fields (`analysis.requirementStatus`, `analysis.riskLevel`, etc.) are retained for backward compatibility with earlier integrations.
+
+---
+
+## Security
+
+- Never commit API keys or credentials to the repository
 - Use environment variables or a secure secret manager
 - Keep production credentials outside the codebase
 
 ---
 
-## Project Goal
+## Roadmap
 
-QA Orchestrator Platform is designed to support modern QA teams by:
-- analyzing Jira requirements
-- generating structured test strategies
-- identifying testing risks
-- recommending automation approaches
-- supporting release decisions
-- integrating with AI-assisted workflow tools
-
----
-
-## Future Improvements
-
-Planned enhancements include:
-- Response contract cleanup to reduce compatibility fields
-- Bug report generation stage
-- Test execution planning stage
-- Smarter requirement ambiguity detection
-- Expanded release decision logic
-- Web dashboard for QA insights
-
----
-
-## Documentation
-
-Project documentation is available in the `/docs` directory.
-- API Contract → docs/api_contract.md
-- Architecture → docs/architecture.md
-- Roadmap → docs/roadmap.md
-
----
-
-## API Endpoints
-
-Current QA analysis endpoints:
-```
-POST /qa/api/v1/qa/analyze
-POST /qa/analyze
-POST /qa/run/{issueKey}
-```
+| Phase | Status | Description |
+|-------|--------|-------------|
+| Phase 1 | ✅ Complete | Spring Boot backend, Jira integration, multi-stage pipeline, Render deployment |
+| Phase 2 | ✅ Complete | LLM-powered stages, versioned API contract, Copilot Studio integration |
+| Phase 3 | 🔄 Planned | QA Context Service, historical bug analysis, coverage-based risk scoring |
+| Phase 4 | 🔄 Planned | Test execution planning, coverage tracking, QA insights dashboard |

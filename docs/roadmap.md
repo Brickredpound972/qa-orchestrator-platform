@@ -1,31 +1,45 @@
 # QA Orchestrator Platform — Roadmap
 
-## Phase 1 — Foundation (Current)
+## Phase 1 — Foundation ✅ Complete
 
 - Spring Boot backend
-- Jira issue retrieval
-- Multi-agent QA pipeline
-- Render deployment
+- Jira issue retrieval via REST API
+- Multi-stage QA pipeline (Requirement, TestDesign, Automation, Risk)
+- Render cloud deployment
 - Copilot Studio integration
-- API contract
+- Versioned API contract (v2)
 
-## Phase 2 — Productization
+---
 
-- Architecture documentation
-- API contract stabilization
-- structured error responses
-- logging and observability
+## Phase 2 — LLM Intelligence ✅ Complete
 
-## Phase 3 — QA Intelligence Layer
+- LLM-powered pipeline (Groq API — Llama 3.3 70B)
+- RequirementAnalysisStage — LLM-powered
+- TestDesignStage — LLM-powered, feeds from RequirementStage
+- AutomationDecisionStage — LLM-powered, reads test case type distribution
+- RiskAnalysisStage — LLM-powered, reads full pipeline context
+- BugReportStage — LLM-powered, generates pre-filled bug report templates
+- Pipeline refactor — stages feed each other, no keyword matching
+- Controller fix — pipeline runs once per request
+- README, architecture, API contract updated
 
-- QA Context Service
-- historical bug analysis
-- coverage-based risk scoring
-- release decision engine
+---
 
-## Phase 4 — Extended QA Lifecycle
+## Phase 3 — QA Intelligence Layer 🔄 Planned
 
-- Bug report generation
-- test execution planning
-- coverage tracking
+- QA Context Service — historical ticket awareness
+- Historical bug analysis — bug density per component
+- Coverage-based risk scoring — risk adjusted by existing test coverage
+- Release decision engine — structured go/no-go logic
+- Structured error responses — standardized error contract
+- Logging and observability — request tracing, stage timing
+
+---
+
+## Phase 4 — Extended QA Lifecycle 🔄 Planned
+
+- Test execution planning stage
+- Coverage tracking
 - QA insights dashboard
+- Smarter requirement ambiguity detection
+- Expanded release decision logic

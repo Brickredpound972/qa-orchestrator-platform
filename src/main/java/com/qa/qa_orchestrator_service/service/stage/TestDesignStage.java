@@ -1,5 +1,8 @@
 package com.qa.qa_orchestrator_service.service.stage;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.qa.qa_orchestrator_service.service.llm.GroqClient;
 import com.qa.qa_orchestrator_service.model.QaAnalysisResult;
 import com.qa.qa_orchestrator_service.model.QaTestCase;
 import com.qa.qa_orchestrator_service.model.TestDesignStageArtifact;
@@ -8,204 +11,180 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * TestDesignStage — LLM-powered
+ *
+ * Takes RequirementStage output (clarifiedRequirements + edgeCases)
+ * and produces concrete, execution-ready test cases via Groq.
+ *
+ * KEY LESSON:
+ * This stage does NOT re-read the raw Jira JSON.
+ * It reads the OUTPUT of RequirementAnalysisStage.
+ * This is what makes it a real pipeline — stages feed each other.
+ */
 @Component
 public class TestDesignStage {
 
+    private static final String SYSTEM_PROMPT = """
+            You are a senior QA engineer designing test cases.
+
+            You will receive a list of clarified requirements and edge cases extracted from a Jira issue.
+            Your job is to produce structured, execution-ready test cases.
+
+            RULES:
+            - Return ONLY valid JSON. No markdown, no explanation, no code blocks.
+            - Generate at least 5 test cases.
+            - Cover both positive (happy path) and negative (failure/validation) scenarios.
+            - Cover edge cases where relevant.
+            - testType must be one of: UI, API, E2E
+            - suiteTag must be one of: Smoke, Regression
+            - priority must be one of: High, Medium, Low
+            - steps must be a concrete list of user or system actions.
+            - expectedResult must be a specific, verifiable outcome.
+
+            REQUIRED JSON STRUCTURE:
+            {
+              "testScenarios": ["scenario 1", "scenario 2"],
+              "testCases": [
+                {
+                  "id": "TC-01",
+                  "title": "short descriptive title",
+                  "preconditions": "what must be true before this test runs",
+                  "steps": ["step 1", "step 2", "step 3"],
+                  "expectedResult": "what should happen if the feature works correctly",
+                  "testType": "UI",
+                  "suiteTag": "Smoke",
+                  "testData": "specific data used in this test",
+                  "priority": "High"
+                }
+              ]
+            }
+            """;
+
+    private final GroqClient groqClient;
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    public TestDesignStage(GroqClient groqClient) {
+        this.groqClient = groqClient;
+    }
+
     public void apply(QaAnalysisResult result, String raw) {
-        List<String> scenarios = extractBulletSection(raw, "Test Strategy:");
-        List<QaTestCase> generatedTestCases;
+        try {
+            // Build input from RequirementStage output — not from raw Jira JSON
+            String stageInput = buildStageInput(result);
+            String groqResponse = groqClient.call(SYSTEM_PROMPT, stageInput);
+            applyParsedResponse(result, groqResponse);
 
-        result.setTestScenarios(scenarios);
-        generatedTestCases = buildGeneratedTestCases(result);
-        result.setTestCases(generatedTestCases);
-
-        TestDesignStageArtifact artifact = new TestDesignStageArtifact();
-        artifact.setTestScenarios(scenarios);
-        artifact.setTestCases(generatedTestCases);
-
-        result.setTestDesignStage(artifact);
+        } catch (Exception e) {
+            applyFallback(result, e.getMessage());
+        }
     }
 
-    private List<String> extractBulletSection(String raw, String sectionHeader) {
-        List<String> items = new ArrayList<>();
-        if (raw == null || sectionHeader == null) {
-            return items;
+    /**
+     * Build the prompt input using RequirementStage output.
+     *
+     * This is the key architectural point:
+     * We pass clarifiedRequirements + edgeCases to the LLM,
+     * not the raw Jira ticket. Each stage builds on the previous one.
+     */
+    private String buildStageInput(QaAnalysisResult result) {
+        StringBuilder input = new StringBuilder();
+
+        input.append("Feature Summary: ")
+             .append(result.getFeatureSummary() != null ? result.getFeatureSummary() : "Not available")
+             .append("\n\n");
+
+        input.append("Clarified Requirements:\n");
+        List<String> requirements = result.getClarifiedRequirements();
+        if (requirements != null && !requirements.isEmpty()) {
+            for (String req : requirements) {
+                input.append("- ").append(req).append("\n");
+            }
+        } else {
+            input.append("- Not available\n");
         }
 
-        String[] lines = raw.split("\\R");
-        boolean inSection = false;
-
-        for (String line : lines) {
-            String trimmed = line.trim();
-
-            if (trimmed.equals(sectionHeader.trim())) {
-                inSection = true;
-                continue;
+        input.append("\nEdge Cases:\n");
+        List<String> edgeCases = result.getEdgeCases();
+        if (edgeCases != null && !edgeCases.isEmpty()) {
+            for (String edge : edgeCases) {
+                input.append("- ").append(edge).append("\n");
             }
-
-            if (inSection) {
-                if (trimmed.isEmpty()) {
-                    continue;
-                }
-
-                if (!trimmed.startsWith("-")) {
-                    break;
-                }
-
-                items.add(trimmed.substring(1).trim());
-            }
+        } else {
+            input.append("- Not available\n");
         }
 
-        return items;
+        return input.toString();
     }
 
-    private List<QaTestCase> buildGeneratedTestCases(QaAnalysisResult result) {
+    private void applyParsedResponse(QaAnalysisResult result, String raw) {
+        try {
+            String cleaned = raw
+                    .replaceAll("(?s)```json\\s*", "")
+                    .replaceAll("(?s)```\\s*", "")
+                    .trim();
+
+            JsonNode node = objectMapper.readTree(cleaned);
+
+            List<String> testScenarios = toStringList(node.path("testScenarios"));
+            List<QaTestCase> testCases = parseTestCases(node.path("testCases"));
+
+            result.setTestScenarios(testScenarios);
+            result.setTestCases(testCases);
+
+            TestDesignStageArtifact artifact = new TestDesignStageArtifact();
+            artifact.setTestScenarios(testScenarios);
+            artifact.setTestCases(testCases);
+            result.setTestDesignStage(artifact);
+
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to parse Groq test design response: " + e.getMessage(), e);
+        }
+    }
+
+    private List<QaTestCase> parseTestCases(JsonNode testCasesNode) {
         List<QaTestCase> testCases = new ArrayList<>();
 
-        List<String> scenarios = result.getTestScenarios() != null
-                ? result.getTestScenarios()
-                : new ArrayList<>();
-
-        List<String> edgeCases = result.getEdgeCases() != null
-                ? result.getEdgeCases()
-                : new ArrayList<>();
-
-        int tcIndex = 1;
-
-        for (String scenario : scenarios) {
-            String normalized = scenario.toLowerCase();
-
-            if (normalized.contains("invalid")) {
-                testCases.add(new QaTestCase(
-                        formatTestCaseId(tcIndex++),
-                        "Reject invalid coupon code",
-                        "User has items in cart and an active checkout session",
-                        List.of("Open checkout", "Enter an invalid coupon", "Apply coupon"),
-                        "System should reject the coupon and display validation feedback",
-                        "UI",
-                        "Regression",
-                        "Invalid coupon",
-                        "High"));
-            } else if (normalized.contains("valid")) {
-                testCases.add(new QaTestCase(
-                        formatTestCaseId(tcIndex++),
-                        "Validate valid coupon application",
-                        "User has items in cart and an active checkout session",
-                        List.of("Open checkout", "Enter a valid coupon", "Apply coupon"),
-                        "System should accept the coupon and apply the discount",
-                        "UI",
-                        "Smoke",
-                        "Valid coupon",
-                        "High"));
-            } else if (normalized.contains("multiple")) {
-                testCases.add(new QaTestCase(
-                        formatTestCaseId(tcIndex++),
-                        "Prevent multiple coupon application",
-                        "User already applied one valid coupon",
-                        List.of("Apply first coupon", "Attempt to apply a second coupon"),
-                        "System should enforce the single coupon restriction",
-                        "UI",
-                        "Regression",
-                        "Two valid coupons",
-                        "High"));
-            } else if (normalized.contains("subtotal")) {
-                testCases.add(new QaTestCase(
-                        formatTestCaseId(tcIndex++),
-                        "Validate subtotal calculation before tax",
-                        "User has taxable items in cart and a valid coupon",
-                        List.of("Open checkout", "Apply valid coupon", "Review subtotal before tax"),
-                        "Discount should be reflected in subtotal before tax is calculated",
-                        "API",
-                        "Regression",
-                        "Coupon + taxable cart",
-                        "High"));
-            } else if (normalized.contains("session")) {
-                testCases.add(new QaTestCase(
-                        formatTestCaseId(tcIndex++),
-                        "Validate coupon persistence in same session",
-                        "User has successfully applied a coupon",
-                        List.of("Apply coupon", "Refresh the page within the same session"),
-                        "Coupon state should persist during the same user session",
-                        "E2E",
-                        "Regression",
-                        "Same session",
-                        "Medium"));
-            }
+        if (!testCasesNode.isArray()) {
+            return testCases;
         }
 
-        for (String edgeCase : edgeCases) {
-            String normalized = edgeCase.toLowerCase();
-
-            if (normalized.contains("invalid coupon")
-                    && !containsTitle(testCases, "Reject invalid coupon code")) {
-                testCases.add(new QaTestCase(
-                        formatTestCaseId(tcIndex++),
-                        "Reject invalid coupon code",
-                        "User has items in cart and an active checkout session",
-                        List.of("Open checkout", "Enter an invalid coupon", "Apply coupon"),
-                        "System should reject the coupon and display validation feedback",
-                        "UI",
-                        "Regression",
-                        "Invalid coupon",
-                        "High"));
-            }
-
-            if (normalized.contains("second coupon")
-                    && !containsTitle(testCases, "Prevent multiple coupon application")) {
-                testCases.add(new QaTestCase(
-                        formatTestCaseId(tcIndex++),
-                        "Prevent multiple coupon application",
-                        "User already applied one valid coupon",
-                        List.of("Apply first coupon", "Attempt to apply a second coupon"),
-                        "System should enforce the single coupon restriction",
-                        "UI",
-                        "Regression",
-                        "Two valid coupons",
-                        "High"));
-            }
-
-            if (normalized.contains("subtotal")
-                    && !containsTitle(testCases, "Validate subtotal calculation before tax")) {
-                testCases.add(new QaTestCase(
-                        formatTestCaseId(tcIndex++),
-                        "Validate subtotal calculation before tax",
-                        "User has taxable items in cart and a valid coupon",
-                        List.of("Open checkout", "Apply valid coupon", "Review subtotal before tax"),
-                        "Discount should be reflected in subtotal before tax is calculated",
-                        "API",
-                        "Regression",
-                        "Coupon + taxable cart",
-                        "High"));
-            }
-
-            if ((normalized.contains("same session") || normalized.contains("refresh"))
-                    && !containsTitle(testCases, "Validate coupon persistence in same session")) {
-                testCases.add(new QaTestCase(
-                        formatTestCaseId(tcIndex++),
-                        "Validate coupon persistence in same session",
-                        "User has successfully applied a coupon",
-                        List.of("Apply coupon", "Refresh the page within the same session"),
-                        "Coupon state should persist during the same user session",
-                        "E2E",
-                        "Regression",
-                        "Same session",
-                        "Medium"));
-            }
+        for (JsonNode tc : testCasesNode) {
+            QaTestCase testCase = new QaTestCase();
+            testCase.setId(tc.path("id").asText("TC-00"));
+            testCase.setTitle(tc.path("title").asText(""));
+            testCase.setPreconditions(tc.path("preconditions").asText(""));
+            testCase.setSteps(toStringList(tc.path("steps")));
+            testCase.setExpectedResult(tc.path("expectedResult").asText(""));
+            testCase.setTestType(tc.path("testType").asText("UI"));
+            testCase.setSuiteTag(tc.path("suiteTag").asText("Regression"));
+            testCase.setTestData(tc.path("testData").asText(""));
+            testCase.setPriority(tc.path("priority").asText("Medium"));
+            testCases.add(testCase);
         }
 
         return testCases;
     }
 
-    private String formatTestCaseId(int index) {
-        return String.format("TC-%02d", index);
+    private void applyFallback(QaAnalysisResult result, String errorMessage) {
+        result.setTestScenarios(List.of());
+        result.setTestCases(List.of());
+
+        TestDesignStageArtifact artifact = new TestDesignStageArtifact();
+        artifact.setTestScenarios(List.of());
+        artifact.setTestCases(List.of());
+        result.setTestDesignStage(artifact);
+
+        System.err.println("TestDesignStage LLM error: " + errorMessage);
     }
 
-    private boolean containsTitle(List<QaTestCase> testCases, String title) {
-        for (QaTestCase testCase : testCases) {
-            if (testCase.getTitle() != null && testCase.getTitle().equalsIgnoreCase(title)) {
-                return true;
+    private List<String> toStringList(JsonNode arrayNode) {
+        List<String> items = new ArrayList<>();
+        if (arrayNode.isArray()) {
+            for (JsonNode item : arrayNode) {
+                items.add(item.asText());
             }
         }
-        return false;
+        return items;
     }
 }
