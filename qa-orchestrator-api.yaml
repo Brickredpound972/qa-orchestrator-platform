@@ -1,8 +1,8 @@
 swagger: '2.0'
 info:
   title: QA Orchestrator API
-  description: Runs QA analysis for a Jira issue and returns a JSON response.
-  version: '1.0.0'
+  description: Runs QA analysis for a Jira issue and returns a structured JSON response.
+  version: '2.0.0'
 
 host: qa-orchestrator-service.onrender.com
 basePath: /
@@ -28,9 +28,355 @@ paths:
           description: QA analysis result
           schema:
             type: object
-            required:
-              - output
             properties:
               output:
                 type: string
-                description: QA analysis result text
+                description: Human-readable summary line
+              analysis:
+                type: object
+                properties:
+                  traceabilityId:
+                    type: string
+                    description: Jira issue key
+                  contractVersion:
+                    type: string
+                    description: API contract version
+                  analysisSummary:
+                    type: string
+                    description: One-line QA decision summary
+                  requirementStatus:
+                    type: string
+                    description: READY or BLOCKED
+                  featureSummary:
+                    type: string
+                    description: One-sentence feature description
+                  riskLevel:
+                    type: string
+                    description: LOW / MEDIUM / HIGH
+                  riskScore:
+                    type: integer
+                    description: Risk score 0-100
+                  releaseRecommendation:
+                    type: string
+                    description: Go / Caution / Block
+                  automationRecommendation:
+                    type: string
+                    description: Automation strategy
+                  stages:
+                    type: object
+                    properties:
+                      requirement:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            description: READY or BLOCKED
+                          featureSummary:
+                            type: string
+                            description: Feature summary
+                          clarifiedRequirements:
+                            type: array
+                            items:
+                              type: string
+                            description: Testable requirements
+                          edgeCases:
+                            type: array
+                            items:
+                              type: string
+                            description: Edge case scenarios
+                          openQuestions:
+                            type: array
+                            items:
+                              type: string
+                            description: Open questions
+                          scope:
+                            type: array
+                            items:
+                              type: string
+                            description: In-scope areas
+                          outOfScope:
+                            type: array
+                            items:
+                              type: string
+                            description: Out-of-scope areas
+                      testDesign:
+                        type: object
+                        properties:
+                          testScenarios:
+                            type: array
+                            items:
+                              type: string
+                            description: Test scenario names
+                          testCases:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id:
+                                  type: string
+                                title:
+                                  type: string
+                                preconditions:
+                                  type: string
+                                steps:
+                                  type: array
+                                  items:
+                                    type: string
+                                expectedResult:
+                                  type: string
+                                testType:
+                                  type: string
+                                suiteTag:
+                                  type: string
+                                testData:
+                                  type: string
+                                priority:
+                                  type: string
+                      automation:
+                        type: object
+                        properties:
+                          automationRecommendation:
+                            type: string
+                          automationReasoning:
+                            type: string
+                          coverageSplit:
+                            type: string
+                          frameworkSuggestion:
+                            type: string
+                      risk:
+                        type: object
+                        properties:
+                          riskScore:
+                            type: integer
+                          riskLevel:
+                            type: string
+                          riskReason:
+                            type: string
+                          topRiskDrivers:
+                            type: array
+                            items:
+                              type: string
+                          releaseRecommendation:
+                            type: string
+                      bugReport:
+                        type: object
+                        properties:
+                          title:
+                            type: string
+                          environment:
+                            type: string
+                          severity:
+                            type: string
+                          priority:
+                            type: string
+                          reproductionSteps:
+                            type: array
+                            items:
+                              type: string
+                          expectedResult:
+                            type: string
+                          actualResult:
+                            type: string
+                          impactSummary:
+                            type: string
+                          affectedAreas:
+                            type: array
+                            items:
+                              type: string
+                          suggestedAssignee:
+                            type: string
+
+  /qa/api/v1/qa/analyze:
+    post:
+      operationId: analyzeQaIssue
+      summary: Analyze QA issue (canonical endpoint)
+      description: Analyzes a Jira issue and returns structured QA insights.
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - issueKey
+            properties:
+              issueKey:
+                type: string
+                description: Jira issue key, for example PROJ-4
+      responses:
+        '200':
+          description: QA analysis result
+          schema:
+            $ref: '#/definitions/QaAnalyzeResponse'
+
+definitions:
+  QaAnalyzeResponse:
+    type: object
+    properties:
+      output:
+        type: string
+        description: Human-readable summary line
+      analysis:
+        $ref: '#/definitions/QaAnalysis'
+
+  QaAnalysis:
+    type: object
+    properties:
+      traceabilityId:
+        type: string
+      contractVersion:
+        type: string
+      analysisSummary:
+        type: string
+      requirementStatus:
+        type: string
+      featureSummary:
+        type: string
+      riskLevel:
+        type: string
+      riskScore:
+        type: integer
+      releaseRecommendation:
+        type: string
+      automationRecommendation:
+        type: string
+      stages:
+        $ref: '#/definitions/QaStages'
+
+  QaStages:
+    type: object
+    properties:
+      requirement:
+        $ref: '#/definitions/RequirementStage'
+      testDesign:
+        $ref: '#/definitions/TestDesignStage'
+      automation:
+        $ref: '#/definitions/AutomationStage'
+      risk:
+        $ref: '#/definitions/RiskStage'
+      bugReport:
+        $ref: '#/definitions/BugReportStage'
+
+  RequirementStage:
+    type: object
+    properties:
+      status:
+        type: string
+      featureSummary:
+        type: string
+      clarifiedRequirements:
+        type: array
+        items:
+          type: string
+      edgeCases:
+        type: array
+        items:
+          type: string
+      openQuestions:
+        type: array
+        items:
+          type: string
+      scope:
+        type: array
+        items:
+          type: string
+      outOfScope:
+        type: array
+        items:
+          type: string
+
+  TestDesignStage:
+    type: object
+    properties:
+      testScenarios:
+        type: array
+        items:
+          type: string
+      testCases:
+        type: array
+        items:
+          $ref: '#/definitions/TestCase'
+
+  TestCase:
+    type: object
+    properties:
+      id:
+        type: string
+      title:
+        type: string
+      preconditions:
+        type: string
+      steps:
+        type: array
+        items:
+          type: string
+      expectedResult:
+        type: string
+      testType:
+        type: string
+      suiteTag:
+        type: string
+      testData:
+        type: string
+      priority:
+        type: string
+
+  AutomationStage:
+    type: object
+    properties:
+      automationRecommendation:
+        type: string
+      automationReasoning:
+        type: string
+      coverageSplit:
+        type: string
+      frameworkSuggestion:
+        type: string
+
+  RiskStage:
+    type: object
+    properties:
+      riskScore:
+        type: integer
+      riskLevel:
+        type: string
+      riskReason:
+        type: string
+      topRiskDrivers:
+        type: array
+        items:
+          type: string
+      releaseRecommendation:
+        type: string
+
+  BugReportStage:
+    type: object
+    properties:
+      title:
+        type: string
+      environment:
+        type: string
+      severity:
+        type: string
+      priority:
+        type: string
+      reproductionSteps:
+        type: array
+        items:
+          type: string
+      expectedResult:
+        type: string
+      actualResult:
+        type: string
+      impactSummary:
+        type: string
+      affectedAreas:
+        type: array
+        items:
+          type: string
+      suggestedAssignee:
+        type: string
