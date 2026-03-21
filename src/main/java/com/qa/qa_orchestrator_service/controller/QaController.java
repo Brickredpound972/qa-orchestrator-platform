@@ -63,6 +63,6 @@ public class QaController {
      */
     private QaAnalyzeResponse executeAnalysis(String issueKey) {
         QaAnalysisResult result = service.runAnalysis(issueKey);
-        return new QaAnalyzeResponse(result.getAnalysisSummary(), result);
+        return new QaAnalyzeResponse(result.getRawOutput(), result);
     }
 }
