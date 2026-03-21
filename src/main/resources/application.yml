@@ -6,6 +6,12 @@ jira:
   email: ${JIRA_EMAIL}
   api-token: ${JIRA_API_TOKEN}
 
-  anthropic:
+groq:
   api-key: ${GROQ_API_KEY}
- 
+
+logging:
+  level:
+    com.qa.qa_orchestrator_service: INFO
+    root: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
