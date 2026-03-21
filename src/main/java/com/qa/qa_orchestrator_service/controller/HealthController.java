@@ -2,6 +2,7 @@ package com.qa.qa_orchestrator_service.controller;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Instant;
@@ -10,11 +11,10 @@ import java.util.Map;
 /**
  * HealthController
  *
- * Simple health check endpoint.
- * Used by Render, Copilot Studio, and monitoring tools
- * to verify the service is alive.
+ * Health check endpoint for Render, Copilot Studio, and monitoring tools.
  */
 @RestController
+@RequestMapping("/qa")
 public class HealthController {
 
     private static final String VERSION = "v2";
