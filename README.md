@@ -7,7 +7,9 @@
 ![LLM](https://img.shields.io/badge/LLM-Groq%20%2F%20Llama%203.3-purple)
 ![DB](https://img.shields.io/badge/DB-PostgreSQL-blue)
 
-**QA Orchestrator Platform** is an AI-powered QA decision engine that analyzes Jira issues and produces structured QA intelligence — including requirement analysis, test cases, automation strategy, risk scoring, bug report templates, and historical intelligence.
+**QA Orchestrator Platform** is an AI-powered QA decision engine that automatically analyzes Jira tickets and produces structured QA intelligence — requirement analysis, test cases, automation strategy, risk scoring, bug report templates, and historical intelligence.
+
+The system is fully automated: when a developer moves a ticket to **"In Progress"**, Jira fires a webhook, the pipeline runs, and results appear on the dashboard — with zero manual steps.
 
 ---
 
@@ -21,12 +23,14 @@
 
 ---
 
-## What It Does
+## How It Works
 
 ```
-Developer writes Jira ticket
+Developer moves ticket to "In Progress"
         ↓
-QA Orchestrator reads the ticket
+Jira fires webhook → POST /qa/webhook/jira
+        ↓
+Pipeline runs automatically (no manual step)
         ↓
 Stage 1 — Requirement Analysis
 Stage 2 — Test Design
@@ -44,10 +48,7 @@ Intelligence Dashboard updated
 ## System Architecture
 
 ```
-User / Copilot Studio / Power Automate
-            │
-            ▼
-      Custom Connector
+Jira (webhook) / Copilot Studio / Power Automate
             │
             ▼
     QA Orchestrator API
@@ -63,7 +64,7 @@ User / Copilot Studio / Power Automate
 
 ## QA Analysis Pipeline
 
-All 5 stages are LLM-powered. Each stage reads from the previous stage output.
+All 5 stages are LLM-powered (Groq / Llama 3.3 70B).
 
 | Stage | Input | Output |
 |-------|-------|--------|
@@ -77,7 +78,7 @@ All 5 stages are LLM-powered. Each stage reads from the previous stage output.
 
 ## Intelligence Dashboard
 
-Available at `/qa/dashboard` — a live browser-accessible dashboard showing:
+Available at `/qa/dashboard`:
 
 - Total analyses, average risk score, high risk count, blocked releases
 - Risk distribution chart (High / Medium / Low)
@@ -87,15 +88,28 @@ Available at `/qa/dashboard` — a live browser-accessible dashboard showing:
 
 ---
 
+## Jira Webhook
+
+Fully automated trigger — no manual API calls needed.
+
+**Setup:**
+1. Jira → System → WebHooks → Create a WebHook
+2. URL: `https://qa-orchestrator-service.onrender.com/qa/webhook/jira`
+3. Event: `Issue updated`
+4. JQL: `project = PROJ`
+
+When a ticket moves to **"In Progress"**, the pipeline runs automatically.
+
+---
+
 ## API Endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/qa/health` | Health check with intelligence summary |
 | GET | `/qa/dashboard` | QA Intelligence Dashboard |
-| POST | `/qa/api/v1/qa/analyze` | Primary analysis endpoint |
-| POST | `/qa/analyze` | Compatibility alias |
-| POST | `/qa/run/{issueKey}` | Legacy path |
+| POST | `/qa/api/v1/qa/analyze` | Manual analysis trigger |
+| POST | `/qa/webhook/jira` | Jira webhook receiver |
 | GET | `/qa/api/v1/history` | Last 10 analyses |
 | GET | `/qa/api/v1/history/{issueKey}` | History for specific ticket |
 | GET | `/qa/api/v1/intelligence/summary` | Aggregated intelligence summary |
@@ -104,19 +118,9 @@ Available at `/qa/dashboard` — a live browser-accessible dashboard showing:
 
 ---
 
-## Example Request
-
-```bash
-curl -X POST https://qa-orchestrator-service.onrender.com/qa/api/v1/qa/analyze \
--H "Content-Type: application/json" \
--d '{"issueKey":"PROJ-4"}'
-```
-
----
-
 ## Input Validation
 
-The `issueKey` field must follow Jira format: `PROJECT-NUMBER` (e.g. `PROJ-4`, `QA-123`).
+`issueKey` must follow Jira format: `PROJECT-NUMBER` (e.g. `PROJ-4`, `QA-123`).
 
 Invalid input returns:
 
@@ -150,7 +154,7 @@ Invalid input returns:
 | LLM | Groq API (Llama 3.3 70B) |
 | Database | PostgreSQL (Render) |
 | Infrastructure | Docker, Render |
-| Integrations | Jira REST API, Microsoft Copilot Studio, Power Automate |
+| Integrations | Jira REST API, Jira Webhooks, Microsoft Copilot Studio, Power Automate |
 
 ---
 
@@ -194,4 +198,5 @@ export SPRING_DATASOURCE_PASSWORD=your-password
 | Phase 3 | ✅ Complete | Structured logging, health endpoint, error handling, retry logic |
 | Phase 4 | ✅ Complete | Input validation, timeout protection, Jira error handling, logging cleanup |
 | Phase 5 | ✅ Complete | PostgreSQL persistence, history API, intelligence endpoints, dashboard |
-| Phase 6 | 📋 Planned | Coverage tracking, risk trends, historical bug analysis, dashboard improvements |
+| Phase 6 | ✅ Complete | Jira webhook — fully automated, zero manual steps |
+| Phase 7 | 📋 Planned | Coverage tracking, risk trends, historical bug analysis, dashboard improvements |
