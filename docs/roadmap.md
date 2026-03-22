@@ -38,12 +38,24 @@
 - Jira 404 — clean error response
 - Jira comment toggle (jira.comment-enabled flag)
 - System.out.println → SLF4J logging throughout
-- Validated across 3 domains (Login, Coupon, Shopping Cart)
+- JPA open-in-view disabled
+- Validated across 5 domains (Login, Coupon, Cart, Password Reset, Email Notifications, User Profile)
 
-## Phase 5 — QA Intelligence Layer 📋 Planned
+## Phase 5 — QA Intelligence Layer ✅ Complete
 
-- Historical bug analysis
-- Coverage-based risk scoring
-- Release decision engine improvements
-- QA insights dashboard
-- Test execution planning
+- PostgreSQL database on Render (Free tier)
+- AnalysisRecord entity — persists every pipeline result
+- History endpoints — recent analyses and per-issue history
+- Intelligence endpoints — summary, high-risk, blocked tickets
+- Health endpoint enriched with intelligence summary
+- QA Intelligence Dashboard at `/qa/dashboard`
+- Risk distribution and release decision charts
+- Validated with 5 real Jira tickets across different domains
+
+## Phase 6 — Extended QA Lifecycle 📋 Planned
+
+- Coverage tracking across test suites
+- Risk trend analysis — how risk evolves across re-analyses
+- Historical bug analysis for smarter risk scoring
+- Copilot Studio intelligence integration
+- Dashboard improvements — drill-down, filtering, search

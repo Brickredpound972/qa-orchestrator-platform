@@ -5,31 +5,38 @@
 ![API](https://img.shields.io/badge/API-Live-brightgreen)
 ![Contract](https://img.shields.io/badge/Contract-v2-orange)
 ![LLM](https://img.shields.io/badge/LLM-Groq%20%2F%20Llama%203.3-purple)
+![DB](https://img.shields.io/badge/DB-PostgreSQL-blue)
 
-**QA Orchestrator Platform** is an AI-powered QA decision engine that analyzes Jira issues and produces structured QA intelligence — including requirement analysis, test cases, automation strategy, risk scoring, and bug report templates.
+**QA Orchestrator Platform** is an AI-powered QA decision engine that analyzes Jira issues and produces structured QA intelligence — including requirement analysis, test cases, automation strategy, risk scoring, bug report templates, and historical intelligence.
 
-Each stage is powered by a large language model (LLM). The system reasons about the feature like a senior QA engineer, not a keyword matcher.
+---
+
+## Live
+
+| | URL |
+|---|---|
+| API | https://qa-orchestrator-service.onrender.com |
+| Dashboard | https://qa-orchestrator-service.onrender.com/qa/dashboard |
+| Health | https://qa-orchestrator-service.onrender.com/qa/health |
 
 ---
 
 ## What It Does
-
-Instead of manually analyzing a ticket, the system does this automatically:
 
 ```
 Developer writes Jira ticket
         ↓
 QA Orchestrator reads the ticket
         ↓
-Requirement Analysis   → clarified requirements, edge cases, open questions
+Stage 1 — Requirement Analysis
+Stage 2 — Test Design
+Stage 3 — Automation Decision
+Stage 4 — Risk Analysis
+Stage 5 — Bug Report Template
         ↓
-Test Design            → test scenarios, structured test cases
+Results saved to PostgreSQL
         ↓
-Automation Decision    → strategy, coverage split, framework recommendation
-        ↓
-Risk Analysis          → risk score, risk drivers, release recommendation
-        ↓
-Bug Report Template    → pre-filled bug report ready for QA engineer
+Intelligence Dashboard updated
 ```
 
 ---
@@ -47,9 +54,9 @@ User / Copilot Studio / Power Automate
             │
             ▼
      Spring Boot Service
-       │           │
-       ▼           ▼
-  Jira REST API   Groq LLM API
+       │           │           │
+       ▼           ▼           ▼
+  Jira REST    Groq LLM    PostgreSQL
 ```
 
 ---
@@ -58,57 +65,42 @@ User / Copilot Studio / Power Automate
 
 All 5 stages are LLM-powered. Each stage reads from the previous stage output.
 
-### Stage 1 — Requirement Analysis
-Reads the raw Jira JSON. Produces:
-- `status` (READY / BLOCKED)
-- `featureSummary`
-- `clarifiedRequirements`
-- `edgeCases`
-- `openQuestions`
-- `scope` / `outOfScope`
-
-### Stage 2 — Test Design
-Reads clarified requirements and edge cases from Stage 1. Produces:
-- `testScenarios`
-- `testCases` (id, title, preconditions, steps, expectedResult, testType, suiteTag, testData, priority)
-
-### Stage 3 — Automation Decision
-Reads test case types (UI/API/E2E counts) and risk level. Produces:
-- `automationRecommendation`
-- `automationReasoning`
-- `coverageSplit`
-- `frameworkSuggestion`
-
-### Stage 4 — Risk Analysis
-Reads all previous stage outputs. Produces:
-- `riskScore` (0–100)
-- `riskLevel` (LOW / MEDIUM / HIGH)
-- `riskReason`
-- `topRiskDrivers`
-- `releaseRecommendation` (Go / Caution / Block)
-
-### Stage 5 — Bug Report
-Reads full pipeline context. Produces:
-- `title`, `severity`, `priority`
-- `reproductionSteps`
-- `expectedResult` / `actualResult`
-- `impactSummary`
-- `affectedAreas`
-- `suggestedAssignee`
+| Stage | Input | Output |
+|-------|-------|--------|
+| Requirement Analysis | Raw Jira JSON | clarifiedRequirements, edgeCases, openQuestions, scope |
+| Test Design | Requirement stage output | testScenarios, testCases |
+| Automation Decision | Test case distribution + risk | automationRecommendation, coverageSplit, framework |
+| Risk Analysis | All previous stages | riskScore, riskLevel, releaseRecommendation |
+| Bug Report | Full pipeline context | bug report template ready for QA engineer |
 
 ---
 
-## Live API
+## Intelligence Dashboard
 
-```
-https://qa-orchestrator-service.onrender.com
-```
+Available at `/qa/dashboard` — a live browser-accessible dashboard showing:
 
-Health check:
+- Total analyses, average risk score, high risk count, blocked releases
+- Risk distribution chart (High / Medium / Low)
+- Release decision chart (Block / Caution / Go)
+- Recent analyses table with risk badges
+- Blocked tickets list with automation strategy
 
-```
-https://qa-orchestrator-service.onrender.com/qa/health
-```
+---
+
+## API Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/qa/health` | Health check with intelligence summary |
+| GET | `/qa/dashboard` | QA Intelligence Dashboard |
+| POST | `/qa/api/v1/qa/analyze` | Primary analysis endpoint |
+| POST | `/qa/analyze` | Compatibility alias |
+| POST | `/qa/run/{issueKey}` | Legacy path |
+| GET | `/qa/api/v1/history` | Last 10 analyses |
+| GET | `/qa/api/v1/history/{issueKey}` | History for specific ticket |
+| GET | `/qa/api/v1/intelligence/summary` | Aggregated intelligence summary |
+| GET | `/qa/api/v1/intelligence/high-risk` | All HIGH risk analyses |
+| GET | `/qa/api/v1/intelligence/blocked` | All blocked analyses |
 
 ---
 
@@ -122,68 +114,9 @@ curl -X POST https://qa-orchestrator-service.onrender.com/qa/api/v1/qa/analyze \
 
 ---
 
-## Example Response (condensed)
-
-```json
-{
-  "output": "...",
-  "analysis": {
-    "traceabilityId": "PROJ-4",
-    "contractVersion": "v2",
-    "analysisSummary": "Requirement status: READY. Automation: Hybrid (UI + API). Risk: MEDIUM (60). Release decision: Caution.",
-    "stages": {
-      "requirement": {
-        "status": "READY",
-        "featureSummary": "...",
-        "clarifiedRequirements": ["..."],
-        "edgeCases": ["..."],
-        "openQuestions": ["..."]
-      },
-      "testDesign": {
-        "testScenarios": ["..."],
-        "testCases": [{ "id": "TC-01", "title": "...", "testType": "UI", "priority": "High" }]
-      },
-      "automation": {
-        "automationRecommendation": "Hybrid (UI + API)",
-        "coverageSplit": "UI 60% / API 40%",
-        "frameworkSuggestion": "Java + Selenium + TestNG + REST Assured"
-      },
-      "risk": {
-        "riskScore": 60,
-        "riskLevel": "MEDIUM",
-        "releaseRecommendation": "Caution"
-      },
-      "bugReport": {
-        "title": "...",
-        "severity": "Medium",
-        "priority": "P3",
-        "suggestedAssignee": "Backend Developer"
-      }
-    }
-  }
-}
-```
-
----
-
-## API Endpoints
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/qa/health` | Health check |
-| POST | `/qa/api/v1/qa/analyze` | Primary endpoint |
-| POST | `/qa/analyze` | Compatibility alias |
-| POST | `/qa/run/{issueKey}` | Legacy path endpoint |
-
----
-
 ## Input Validation
 
-The `issueKey` field is validated before the pipeline runs:
-
-- Required, non-blank
-- Max 50 characters
-- Must match Jira format: `PROJECT-NUMBER` (e.g. `PROJ-4`, `QA-123`)
+The `issueKey` field must follow Jira format: `PROJECT-NUMBER` (e.g. `PROJ-4`, `QA-123`).
 
 Invalid input returns:
 
@@ -199,14 +132,11 @@ Invalid input returns:
 
 ## Error Responses
 
-All errors return structured JSON:
-
 | Status | Scenario |
 |--------|----------|
 | 400 | Invalid issueKey format |
 | 404 | Jira issue not found |
 | 401 | Jira authentication failed |
-| 429 | LLM rate limit reached |
 | 504 | Pipeline timed out |
 | 500 | Unexpected error |
 
@@ -218,6 +148,7 @@ All errors return structured JSON:
 |-------|-----------|
 | Backend | Java 17, Spring Boot 3, Maven |
 | LLM | Groq API (Llama 3.3 70B) |
+| Database | PostgreSQL (Render) |
 | Infrastructure | Docker, Render |
 | Integrations | Jira REST API, Microsoft Copilot Studio, Power Automate |
 
@@ -231,6 +162,9 @@ All errors return structured JSON:
 | `JIRA_EMAIL` | Yes | Jira account email |
 | `JIRA_API_TOKEN` | Yes | Jira API token |
 | `GROQ_API_KEY` | Yes | Groq API key |
+| `SPRING_DATASOURCE_URL` | Yes | PostgreSQL JDBC URL |
+| `SPRING_DATASOURCE_USERNAME` | Yes | PostgreSQL username |
+| `SPRING_DATASOURCE_PASSWORD` | Yes | PostgreSQL password |
 | `JIRA_COMMENT_ENABLED` | No | Write analysis as Jira comment (default: false) |
 
 ---
@@ -242,17 +176,12 @@ export JIRA_BASE_URL=https://your-domain.atlassian.net
 export JIRA_EMAIL=your-email@example.com
 export JIRA_API_TOKEN=your-jira-api-token
 export GROQ_API_KEY=gsk_...
+export SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/qa_orchestrator_db
+export SPRING_DATASOURCE_USERNAME=postgres
+export SPRING_DATASOURCE_PASSWORD=your-password
 
 ./mvnw spring-boot:run
 ```
-
----
-
-## Security
-
-- Never commit API keys or credentials to the repository
-- Use environment variables or a secure secret manager
-- Keep production credentials outside the codebase
 
 ---
 
@@ -260,8 +189,9 @@ export GROQ_API_KEY=gsk_...
 
 | Phase | Status | Description |
 |-------|--------|-------------|
-| Phase 1 | ✅ Complete | Spring Boot backend, Jira integration, multi-stage pipeline, Render deployment |
-| Phase 2 | ✅ Complete | LLM-powered stages, Groq integration, versioned API contract, Copilot Studio integration |
+| Phase 1 | ✅ Complete | Spring Boot backend, Jira integration, pipeline, Render deployment |
+| Phase 2 | ✅ Complete | LLM-powered stages, Groq integration, versioned API contract |
 | Phase 3 | ✅ Complete | Structured logging, health endpoint, error handling, retry logic |
 | Phase 4 | ✅ Complete | Input validation, timeout protection, Jira error handling, logging cleanup |
-| Phase 5 | 📋 Planned | Historical bug analysis, coverage-based risk scoring, QA insights dashboard |
+| Phase 5 | ✅ Complete | PostgreSQL persistence, history API, intelligence endpoints, dashboard |
+| Phase 6 | 📋 Planned | Coverage tracking, risk trends, historical bug analysis, dashboard improvements |
