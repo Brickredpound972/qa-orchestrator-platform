@@ -3,19 +3,24 @@ package com.qa.qa_orchestrator_service.service.llm;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
 /**
  * GroqClient
  *
- * LLM client using Groq API with automatic retry on rate limit (429).
- * Groq free tier has per-minute token limits — retry logic handles this gracefully.
+ * LLM client using Groq API with:
+ * - Automatic retry on rate limit (429)
+ * - 30 second timeout per LLM call
+ * - Connection timeout: 10 seconds
  */
 @Component
 public class GroqClient {
@@ -28,8 +33,15 @@ public class GroqClient {
     @Value("${groq.api-key}")
     private String apiKey;
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    public GroqClient(RestTemplateBuilder builder) {
+        this.restTemplate = builder
+                .connectTimeout(Duration.ofSeconds(10))
+                .readTimeout(Duration.ofSeconds(30))
+                .build();
+    }
 
     public String call(String systemPrompt, String userContent) {
         int attempts = 0;
@@ -56,6 +68,9 @@ public class GroqClient {
                 } else {
                     throw new RuntimeException("Groq API call failed: " + e.getMessage(), e);
                 }
+
+            } catch (ResourceAccessException e) {
+                throw new RuntimeException("Groq API call timed out after 30 seconds. Please try again.", e);
             } catch (Exception e) {
                 throw new RuntimeException("Groq API call failed: " + e.getMessage(), e);
             }

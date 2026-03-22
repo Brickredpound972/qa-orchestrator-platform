@@ -1,74 +1,92 @@
 package com.qa.qa_orchestrator_service.jira;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
-import java.util.List;
-import java.util.Map;
-
+/**
+ * JiraClient
+ *
+ * Jira REST API client with:
+ * - 10 second connection timeout
+ * - 15 second read timeout
+ * - Friendly error messages for common failures
+ */
 @Component
 public class JiraClient {
 
-        @Value("${jira.base-url}")
-        private String baseUrl;
+    @Value("${jira.base-url}")
+    private String baseUrl;
 
-        @Value("${jira.email}")
-        private String email;
+    @Value("${jira.email}")
+    private String email;
 
-        @Value("${jira.api-token}")
-        private String token;
+    @Value("${jira.api-token}")
+    private String token;
 
-        private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
 
-        public String getIssue(String issueKey) {
+    public JiraClient(RestTemplateBuilder builder) {
+        this.restTemplate = builder
+                .connectTimeout(Duration.ofSeconds(10))
+                .readTimeout(Duration.ofSeconds(15))
+                .build();
+    }
 
-                String url = baseUrl + "/rest/api/3/issue/" + issueKey +
-                                "?fields=summary,description,issuetype,priority,status";
+    public String getIssue(String issueKey) {
+        String url = baseUrl + "/rest/api/3/issue/" + issueKey +
+                "?fields=summary,description,issuetype,priority,status";
 
-                HttpHeaders headers = new HttpHeaders();
-                headers.setBasicAuth(email, token);
-                headers.setAccept(List.of(MediaType.APPLICATION_JSON));
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBasicAuth(email, token);
+        headers.setAccept(List.of(MediaType.APPLICATION_JSON));
 
-                HttpEntity<String> entity = new HttpEntity<>(headers);
+        HttpEntity<String> entity = new HttpEntity<>(headers);
 
-                ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
+        try {
+            ResponseEntity<String> response = restTemplate.exchange(
+                    url, HttpMethod.GET, entity, String.class);
+            return response.getBody();
 
-                return response.getBody();
+        } catch (HttpClientErrorException e) {
+            if (e.getStatusCode().value() == 404) {
+                throw new RuntimeException("Jira issue not found: " + issueKey +
+                        ". Please verify the issue key exists in your Jira project.");
+            }
+            if (e.getStatusCode().value() == 401) {
+                throw new RuntimeException("Jira authentication failed. Check JIRA_EMAIL and JIRA_API_TOKEN.");
+            }
+            throw new RuntimeException("Jira API error: " + e.getMessage());
         }
+    }
 
-        public void addComment(String issueKey, String commentBody) {
+    public void addComment(String issueKey, String commentBody) {
+        String url = baseUrl + "/rest/api/3/issue/" + issueKey + "/comment";
 
-                String url = baseUrl + "/rest/api/3/issue/" + issueKey + "/comment";
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBasicAuth(email, token);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setAccept(List.of(MediaType.APPLICATION_JSON));
 
-                HttpHeaders headers = new HttpHeaders();
-                headers.setBasicAuth(email, token);
-                headers.setContentType(MediaType.APPLICATION_JSON);
-                headers.setAccept(List.of(MediaType.APPLICATION_JSON));
+        Map<String, Object> textNode = Map.of("type", "text", "text", commentBody);
+        Map<String, Object> paragraphNode = Map.of("type", "paragraph", "content", List.of(textNode));
+        Map<String, Object> bodyNode = Map.of("type", "doc", "version", 1, "content", List.of(paragraphNode));
+        Map<String, Object> payload = Map.of("body", bodyNode);
 
-                Map<String, Object> textNode = Map.of(
-                                "type", "text",
-                                "text", commentBody);
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(payload, headers);
 
-                Map<String, Object> paragraphNode = Map.of(
-                                "type", "paragraph",
-                                "content", List.of(textNode));
-
-                Map<String, Object> bodyNode = Map.of(
-                                "type", "doc",
-                                "version", 1,
-                                "content", List.of(paragraphNode));
-
-                Map<String, Object> payload = Map.of(
-                                "body", bodyNode);
-
-                HttpEntity<Map<String, Object>> entity = new HttpEntity<>(payload, headers);
-
-                restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
+        try {
+            restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
+        } catch (Exception e) {
+            // Comment failure should not block the pipeline
+            System.out.println("[JIRA] Comment failed for " + issueKey + ": " + e.getMessage());
         }
-
+    }
 }
