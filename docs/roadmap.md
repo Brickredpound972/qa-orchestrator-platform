@@ -3,43 +3,43 @@
 ## Phase 1 — Foundation ✅ Complete
 
 - Spring Boot backend
-- Jira issue retrieval via REST API
-- Multi-stage QA pipeline (Requirement, TestDesign, Automation, Risk)
-- Render cloud deployment
+- Jira issue retrieval
+- Multi-agent QA pipeline
+- Render deployment
 - Copilot Studio integration
-- Versioned API contract (v2)
-
----
+- API contract
 
 ## Phase 2 — LLM Intelligence ✅ Complete
 
-- LLM-powered pipeline (Groq API — Llama 3.3 70B)
-- RequirementAnalysisStage — LLM-powered
-- TestDesignStage — LLM-powered, feeds from RequirementStage
-- AutomationDecisionStage — LLM-powered, reads test case type distribution
-- RiskAnalysisStage — LLM-powered, reads full pipeline context
-- BugReportStage — LLM-powered, generates pre-filled bug report templates
-- Pipeline refactor — stages feed each other, no keyword matching
-- Controller fix — pipeline runs once per request
-- README, architecture, API contract updated
+- Groq LLM integration (llama-3.3-70b-versatile)
+- LLM-powered requirement analysis
+- LLM-powered test design
+- LLM-powered automation decision
+- LLM-powered risk analysis
+- LLM-powered bug report generation
+- Formatted pipeline output for Copilot Studio
+- Retry logic for Groq rate limits
 
----
+## Phase 3 — Observability & Reliability ✅ Complete
 
-## Phase 3 — QA Intelligence Layer 🔄 Planned
+- Structured pipeline logging with stage timing
+- Health check endpoint (`/qa/health`)
+- Structured error responses (GlobalExceptionHandler)
+- Groq retry mechanism (429 handling)
+- application.yml cleanup
+- Render sleep prevention (cron-job on /qa/health)
 
-- QA Context Service — historical ticket awareness
-- Historical bug analysis — bug density per component
-- Coverage-based risk scoring — risk adjusted by existing test coverage
-- Release decision engine — structured go/no-go logic
-- Structured error responses — standardized error contract
-- Logging and observability — request tracing, stage timing
+## Phase 4 — Hardening & Quality 🔄 In Progress
 
----
+- Input validation (issueKey format enforcement)
+- Request/response sanitization
+- Improved Jira error messages
+- Pipeline timeout protection
+- Coverage tracking foundations
 
-## Phase 4 — Extended QA Lifecycle 🔄 Planned
+## Phase 5 — QA Intelligence Layer (Planned)
 
-- Test execution planning stage
-- Coverage tracking
+- Historical bug analysis
+- Coverage-based risk scoring
+- Release decision engine
 - QA insights dashboard
-- Smarter requirement ambiguity detection
-- Expanded release decision logic

@@ -4,7 +4,7 @@
 ![Spring Boot](https://img.shields.io/badge/SpringBoot-3-green)
 ![API](https://img.shields.io/badge/API-Live-brightgreen)
 ![Contract](https://img.shields.io/badge/Contract-v2-orange)
-![LLM](https://img.shields.io/badge/LLM-Groq%20%2F%20Claude-purple)
+![LLM](https://img.shields.io/badge/LLM-Groq%20%2F%20Llama%203.3-purple)
 
 **QA Orchestrator Platform** is an AI-powered QA decision engine that analyzes Jira issues and produces structured QA intelligence — including requirement analysis, test cases, automation strategy, risk scoring, and bug report templates.
 
@@ -107,6 +107,12 @@ Production endpoint:
 https://qa-orchestrator-service.onrender.com
 ```
 
+Health check:
+
+```
+https://qa-orchestrator-service.onrender.com/qa/health
+```
+
 ---
 
 ## Example Request
@@ -180,6 +186,7 @@ curl -X POST https://qa-orchestrator-service.onrender.com/qa/api/v1/qa/analyze \
 
 | Method | Path | Description |
 |--------|------|-------------|
+| GET | `/qa/health` | Health check |
 | POST | `/qa/api/v1/qa/analyze` | Primary endpoint |
 | POST | `/qa/analyze` | Compatibility alias |
 | POST | `/qa/run/{issueKey}` | Legacy path endpoint |
@@ -252,6 +259,7 @@ Top-level fields (`analysis.requirementStatus`, `analysis.riskLevel`, etc.) are 
 | Phase | Status | Description |
 |-------|--------|-------------|
 | Phase 1 | ✅ Complete | Spring Boot backend, Jira integration, multi-stage pipeline, Render deployment |
-| Phase 2 | ✅ Complete | LLM-powered stages, versioned API contract, Copilot Studio integration |
-| Phase 3 | 🔄 Planned | QA Context Service, historical bug analysis, coverage-based risk scoring |
-| Phase 4 | 🔄 Planned | Test execution planning, coverage tracking, QA insights dashboard |
+| Phase 2 | ✅ Complete | LLM-powered stages, Groq integration, versioned API contract, Copilot Studio integration |
+| Phase 3 | ✅ Complete | Structured logging, health endpoint, error handling, retry logic, observability |
+| Phase 4 | 🔄 In Progress | Input validation, pipeline hardening, coverage tracking |
+| Phase 5 | 📋 Planned | Historical bug analysis, coverage-based risk scoring, QA insights dashboard |
