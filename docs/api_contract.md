@@ -346,3 +346,44 @@ curl -X POST http://localhost:10000/qa/api/v1/qa/analyze \
 - Microsoft Copilot Studio
 - Power Automate
 - Dashboard visualization
+
+---
+
+# History & Intelligence Endpoints
+
+## GET `/qa/api/v1/history`
+
+Returns the last 10 analysis records.
+
+## GET `/qa/api/v1/history/{issueKey}`
+
+Returns all analysis records for a specific Jira issue key.
+
+Example: `/qa/api/v1/history/PROJ-5`
+
+## GET `/qa/api/v1/intelligence/summary`
+
+Returns an aggregated intelligence summary across all analyses.
+
+Example response:
+
+```json
+{
+  "totalAnalyses": 10,
+  "averageRiskScore": 78,
+  "highRiskCount": 7,
+  "blockedCount": 5,
+  "mostAnalyzedIssues": [
+    { "issueKey": "PROJ-5", "count": 3 },
+    { "issueKey": "PROJ-6", "count": 2 }
+  ]
+}
+```
+
+## GET `/qa/api/v1/intelligence/high-risk`
+
+Returns all analyses with riskLevel = HIGH, ordered by risk score descending.
+
+## GET `/qa/api/v1/intelligence/blocked`
+
+Returns all analyses with releaseRecommendation = Block, ordered by most recent first.
