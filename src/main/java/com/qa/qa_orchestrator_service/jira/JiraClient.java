@@ -23,6 +23,9 @@ public class JiraClient {
     @Value("${jira.api-token}")
     private String token;
 
+    @Value("${jira.comment-enabled:false}")
+    private boolean commentEnabled;
+
     private final RestTemplate restTemplate;
 
     public JiraClient(RestTemplateBuilder builder) {
@@ -59,6 +62,11 @@ public class JiraClient {
     }
 
     public void addComment(String issueKey, String commentBody) {
+        if (!commentEnabled) {
+            System.out.println("[JIRA] Comment skipped for " + issueKey + " (jira.comment-enabled=false)");
+            return;
+        }
+
         String url = baseUrl + "/rest/api/3/issue/" + issueKey + "/comment";
 
         HttpHeaders headers = new HttpHeaders();
@@ -75,6 +83,7 @@ public class JiraClient {
 
         try {
             restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
+            System.out.println("[JIRA] Comment added to " + issueKey);
         } catch (Exception e) {
             System.out.println("[JIRA] Comment failed for " + issueKey + ": " + e.getMessage());
         }
