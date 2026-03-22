@@ -8,12 +8,6 @@ import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 
-/**
- * QaController
- *
- * REST controller for the QA analysis pipeline.
- * Validates input before passing to the service layer.
- */
 @RestController
 @RequestMapping("/qa")
 public class QaController {

@@ -11,14 +11,23 @@ import com.qa.qa_orchestrator_service.service.stage.AnalysisSummaryStage;
 import com.qa.qa_orchestrator_service.service.stage.StageAggregationStage;
 import org.springframework.stereotype.Service;
 
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
 /**
  * QaOrchestratorService
  *
- * Orchestrates the full QA analysis pipeline with structured logging.
- * Each stage is timed and logged individually.
+ * Orchestrates the full QA analysis pipeline with:
+ * - Structured logging with stage timing
+ * - Pipeline-level timeout (25 seconds)
+ * - Graceful timeout response instead of hanging
  */
 @Service
 public class QaOrchestratorService {
+
+    private static final int PIPELINE_TIMEOUT_SECONDS = 25;
 
     private final JiraClient jiraClient;
     private final RequirementAnalysisStage requirementAnalysisStage;
@@ -52,99 +61,101 @@ public class QaOrchestratorService {
     }
 
     public QaAnalysisResult runAnalysis(String issueKey) {
-        // Fetch Jira issue
-        long jiraStart = System.currentTimeMillis();
-        String jiraJson;
+        CompletableFuture<QaAnalysisResult> future = CompletableFuture.supplyAsync(
+                () -> runPipeline(issueKey));
+
         try {
-            jiraJson = jiraClient.getIssue(issueKey);
-            pipelineLogger.jiraFetch(issueKey, System.currentTimeMillis() - jiraStart);
-        } catch (Exception e) {
-            pipelineLogger.jiraError(issueKey, e.getMessage());
-            throw e;
+            return future.get(PIPELINE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            future.cancel(true);
+            pipelineLogger.stageError(issueKey, "pipeline", "Pipeline timed out after " + PIPELINE_TIMEOUT_SECONDS + " seconds");
+            return buildTimeoutResult(issueKey);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return buildTimeoutResult(issueKey);
+        } catch (ExecutionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof RuntimeException) {
+                throw (RuntimeException) cause;
+            }
+            throw new RuntimeException("Pipeline execution failed: " + cause.getMessage(), cause);
         }
-
-        // Run pipeline
-        QaAnalysisResult result = runPipeline(issueKey, jiraJson);
-
-        // Post Jira comment
-        try {
-            jiraClient.addComment(issueKey, result.getAnalysisSummary());
-        } catch (Exception e) {
-            pipelineLogger.jiraError(issueKey, "Comment failed: " + e.getMessage());
-        }
-
-        return result;
     }
 
-    private QaAnalysisResult runPipeline(String issueKey, String jiraJson) {
+    private QaAnalysisResult runPipeline(String issueKey) {
+        long jiraStart = System.currentTimeMillis();
+        String jiraJson = jiraClient.getIssue(issueKey);
+        pipelineLogger.jiraFetch(issueKey, System.currentTimeMillis() - jiraStart);
+
         long pipelineStart = System.currentTimeMillis();
         pipelineLogger.pipelineStart(issueKey);
 
         QaAnalysisResult result = new QaAnalysisResult();
         result.setTraceabilityId(issueKey);
         result.setContractVersion("v2");
-        result.setRawOutput(jiraJson);
 
-        // Stage 1 — Requirement Analysis
-        runStage(issueKey, "requirement", () ->
-                requirementAnalysisStage.apply(result, jiraJson));
+        result = runStage(issueKey, "requirement", result, jiraJson,
+                (r, raw) -> requirementAnalysisStage.apply(r, raw));
 
-        // Quality gate — stop if BLOCKED
-        if ("BLOCKED".equalsIgnoreCase(result.getRequirementStatus())) {
+        if ("BLOCKED".equals(result.getRequirementStatus())) {
             pipelineLogger.blockedPipeline(issueKey);
             analysisSummaryStage.apply(result);
             stageAggregationStage.apply(result);
-            pipelineLogger.pipelineEnd(issueKey,
-                    System.currentTimeMillis() - pipelineStart,
+            pipelineLogger.pipelineEnd(issueKey, System.currentTimeMillis() - pipelineStart,
                     result.getRequirementStatus(), result.getRiskLevel(),
                     result.getRiskScore(), result.getReleaseRecommendation());
+            jiraClient.addComment(issueKey, result.getRawOutput() != null ? result.getRawOutput() : "Pipeline blocked.");
             return result;
         }
 
-        // Stage 2 — Test Design
-        runStage(issueKey, "test_design", () ->
-                testDesignStage.apply(result, jiraJson));
+        result = runStage(issueKey, "test_design", result, jiraJson,
+                (r, raw) -> testDesignStage.apply(r, raw));
+        result = runStage(issueKey, "automation", result, jiraJson,
+                (r, raw) -> automationDecisionStage.apply(r, raw));
+        result = runStage(issueKey, "risk", result, jiraJson,
+                (r, raw) -> riskAnalysisStage.apply(r, raw));
+        result = runStage(issueKey, "bug_report", result, jiraJson,
+                (r, raw) -> bugReportStage.apply(r, raw));
 
-        // Stage 3 — Automation Decision
-        runStage(issueKey, "automation", () ->
-                automationDecisionStage.apply(result, jiraJson));
-
-        // Stage 4 — Risk Analysis
-        runStage(issueKey, "risk", () ->
-                riskAnalysisStage.apply(result, jiraJson));
-
-        // Stage 5 — Bug Report
-        runStage(issueKey, "bug_report", () ->
-                bugReportStage.apply(result, jiraJson));
-
-        // Stage 6 — Summary + Aggregation
         analysisSummaryStage.apply(result);
         stageAggregationStage.apply(result);
 
-        long totalDuration = System.currentTimeMillis() - pipelineStart;
-        pipelineLogger.pipelineEnd(issueKey, totalDuration,
+        pipelineLogger.pipelineEnd(issueKey, System.currentTimeMillis() - pipelineStart,
                 result.getRequirementStatus(), result.getRiskLevel(),
                 result.getRiskScore(), result.getReleaseRecommendation());
+
+        jiraClient.addComment(issueKey, result.getRawOutput() != null ? result.getRawOutput() : "Analysis complete.");
 
         return result;
     }
 
-    /**
-     * Runs a stage with timing and error logging.
-     * Stage errors are caught here — pipeline continues with fallback values.
-     */
-    private void runStage(String issueKey, String stageName, Runnable stage) {
+    private QaAnalysisResult runStage(String issueKey, String stageName,
+            QaAnalysisResult result, String raw, StageRunner runner) {
         long start = System.currentTimeMillis();
         pipelineLogger.stageStart(issueKey, stageName);
         try {
-            stage.run();
+            runner.run(result, raw);
             pipelineLogger.stageEnd(issueKey, stageName, System.currentTimeMillis() - start);
         } catch (Exception e) {
             pipelineLogger.stageError(issueKey, stageName, e.getMessage());
+            pipelineLogger.stageFallback(issueKey, stageName);
         }
+        return result;
     }
 
-    public QaAnalysisResult buildStructuredAnalysis(String issueKey, String raw) {
-        return runPipeline(issueKey, raw);
+    private QaAnalysisResult buildTimeoutResult(String issueKey) {
+        QaAnalysisResult result = new QaAnalysisResult();
+        result.setTraceabilityId(issueKey);
+        result.setContractVersion("v2");
+        result.setRequirementStatus("TIMEOUT");
+        result.setRawOutput("Pipeline timed out after " + PIPELINE_TIMEOUT_SECONDS +
+                " seconds. Please try again.");
+        result.setAnalysisSummary("Pipeline timed out. Please try again.");
+        return result;
+    }
+
+    @FunctionalInterface
+    private interface StageRunner {
+        void run(QaAnalysisResult result, String raw);
     }
 }
