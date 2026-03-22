@@ -11,14 +11,6 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
-/**
- * JiraClient
- *
- * Jira REST API client with:
- * - 10 second connection timeout
- * - 15 second read timeout
- * - Friendly error messages for common failures
- */
 @Component
 public class JiraClient {
 
@@ -57,8 +49,7 @@ public class JiraClient {
 
         } catch (HttpClientErrorException e) {
             if (e.getStatusCode().value() == 404) {
-                throw new RuntimeException("Jira issue not found: " + issueKey +
-                        ". Please verify the issue key exists in your Jira project.");
+                throw new JiraIssueNotFoundException(issueKey);
             }
             if (e.getStatusCode().value() == 401) {
                 throw new RuntimeException("Jira authentication failed. Check JIRA_EMAIL and JIRA_API_TOKEN.");
@@ -85,7 +76,6 @@ public class JiraClient {
         try {
             restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
         } catch (Exception e) {
-            // Comment failure should not block the pipeline
             System.out.println("[JIRA] Comment failed for " + issueKey + ": " + e.getMessage());
         }
     }

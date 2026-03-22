@@ -1,5 +1,6 @@
 package com.qa.qa_orchestrator_service.controller;
 
+import com.qa.qa_orchestrator_service.jira.JiraIssueNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -11,11 +12,6 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-/**
- * GlobalExceptionHandler
- *
- * Converts unhandled exceptions into structured JSON error responses.
- */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -24,8 +20,12 @@ public class GlobalExceptionHandler {
         String errors = e.getBindingResult().getFieldErrors().stream()
                 .map(FieldError::getDefaultMessage)
                 .collect(Collectors.joining("; "));
-
         return buildError(HttpStatus.BAD_REQUEST, errors);
+    }
+
+    @ExceptionHandler(JiraIssueNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleJiraNotFound(JiraIssueNotFoundException e) {
+        return buildError(HttpStatus.NOT_FOUND, e.getMessage());
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
@@ -37,13 +37,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleRuntimeException(RuntimeException e) {
         String message = e.getMessage();
 
-        if (message != null && message.contains("404")) {
-            return buildError(HttpStatus.NOT_FOUND, "Jira issue not found. Check the issue key.");
+        if (message != null && message.contains("authentication failed")) {
+            return buildError(HttpStatus.UNAUTHORIZED, message);
         }
-        if (message != null && message.contains("401")) {
-            return buildError(HttpStatus.UNAUTHORIZED, "Jira authentication failed. Check credentials.");
+        if (message != null && message.contains("timed out")) {
+            return buildError(HttpStatus.GATEWAY_TIMEOUT, message);
         }
-        if (message != null && message.contains("429")) {
+        if (message != null && message.contains("rate limit")) {
             return buildError(HttpStatus.TOO_MANY_REQUESTS,
                     "LLM rate limit reached. Please try again in a few minutes.");
         }
