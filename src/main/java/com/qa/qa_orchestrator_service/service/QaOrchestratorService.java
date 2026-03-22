@@ -23,6 +23,7 @@ import java.util.concurrent.TimeoutException;
  * - Structured logging with stage timing
  * - Pipeline-level timeout (25 seconds)
  * - Graceful timeout response instead of hanging
+ * - PostgreSQL persistence of analysis results
  */
 @Service
 public class QaOrchestratorService {
@@ -38,6 +39,7 @@ public class QaOrchestratorService {
     private final AnalysisSummaryStage analysisSummaryStage;
     private final StageAggregationStage stageAggregationStage;
     private final PipelineLogger pipelineLogger;
+    private final AnalysisRecordService analysisRecordService;
 
     public QaOrchestratorService(
             JiraClient jiraClient,
@@ -48,7 +50,8 @@ public class QaOrchestratorService {
             BugReportStage bugReportStage,
             AnalysisSummaryStage analysisSummaryStage,
             StageAggregationStage stageAggregationStage,
-            PipelineLogger pipelineLogger) {
+            PipelineLogger pipelineLogger,
+            AnalysisRecordService analysisRecordService) {
         this.jiraClient = jiraClient;
         this.requirementAnalysisStage = requirementAnalysisStage;
         this.testDesignStage = testDesignStage;
@@ -58,6 +61,7 @@ public class QaOrchestratorService {
         this.analysisSummaryStage = analysisSummaryStage;
         this.stageAggregationStage = stageAggregationStage;
         this.pipelineLogger = pipelineLogger;
+        this.analysisRecordService = analysisRecordService;
     }
 
     public QaAnalysisResult runAnalysis(String issueKey) {
@@ -101,9 +105,11 @@ public class QaOrchestratorService {
             pipelineLogger.blockedPipeline(issueKey);
             analysisSummaryStage.apply(result);
             stageAggregationStage.apply(result);
-            pipelineLogger.pipelineEnd(issueKey, System.currentTimeMillis() - pipelineStart,
+            long duration = System.currentTimeMillis() - pipelineStart;
+            pipelineLogger.pipelineEnd(issueKey, duration,
                     result.getRequirementStatus(), result.getRiskLevel(),
                     result.getRiskScore(), result.getReleaseRecommendation());
+            analysisRecordService.save(result, duration);
             jiraClient.addComment(issueKey, result.getRawOutput() != null ? result.getRawOutput() : "Pipeline blocked.");
             return result;
         }
@@ -120,9 +126,12 @@ public class QaOrchestratorService {
         analysisSummaryStage.apply(result);
         stageAggregationStage.apply(result);
 
-        pipelineLogger.pipelineEnd(issueKey, System.currentTimeMillis() - pipelineStart,
+        long duration = System.currentTimeMillis() - pipelineStart;
+        pipelineLogger.pipelineEnd(issueKey, duration,
                 result.getRequirementStatus(), result.getRiskLevel(),
                 result.getRiskScore(), result.getReleaseRecommendation());
+
+        analysisRecordService.save(result, duration);
 
         jiraClient.addComment(issueKey, result.getRawOutput() != null ? result.getRawOutput() : "Analysis complete.");
 
@@ -148,8 +157,7 @@ public class QaOrchestratorService {
         result.setTraceabilityId(issueKey);
         result.setContractVersion("v2");
         result.setRequirementStatus("TIMEOUT");
-        result.setRawOutput("Pipeline timed out after " + PIPELINE_TIMEOUT_SECONDS +
-                " seconds. Please try again.");
+        result.setRawOutput("Pipeline timed out after " + PIPELINE_TIMEOUT_SECONDS + " seconds. Please try again.");
         result.setAnalysisSummary("Pipeline timed out. Please try again.");
         return result;
     }
