@@ -1,5 +1,7 @@
 package com.qa.qa_orchestrator_service.jira;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.*;
@@ -13,6 +15,8 @@ import java.util.Map;
 
 @Component
 public class JiraClient {
+
+    private static final Logger log = LoggerFactory.getLogger(JiraClient.class);
 
     @Value("${jira.base-url}")
     private String baseUrl;
@@ -63,7 +67,7 @@ public class JiraClient {
 
     public void addComment(String issueKey, String commentBody) {
         if (!commentEnabled) {
-            System.out.println("[JIRA] Comment skipped for " + issueKey + " (jira.comment-enabled=false)");
+            log.info("[JIRA] Comment skipped for {} (jira.comment-enabled=false)", issueKey);
             return;
         }
 
@@ -83,9 +87,9 @@ public class JiraClient {
 
         try {
             restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
-            System.out.println("[JIRA] Comment added to " + issueKey);
+            log.info("[JIRA] Comment added to {}", issueKey);
         } catch (Exception e) {
-            System.out.println("[JIRA] Comment failed for " + issueKey + ": " + e.getMessage());
+            log.warn("[JIRA] Comment failed for {}: {}", issueKey, e.getMessage());
         }
     }
 }
