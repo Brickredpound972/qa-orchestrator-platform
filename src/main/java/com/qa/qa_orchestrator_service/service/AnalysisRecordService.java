@@ -33,9 +33,7 @@ public class AnalysisRecordService {
             record.setRiskScore(result.getRiskScore());
             record.setReleaseRecommendation(result.getReleaseRecommendation());
             record.setAutomationRecommendation(result.getAutomationRecommendation());
-            record.setTestCaseCount(
-                result.getTestCases() != null ? result.getTestCases().size() : 0
-            );
+            record.setTestCaseCount(result.getTestCases() != null ? result.getTestCases().size() : 0);
             record.setAnalyzedAt(Instant.now());
             record.setPipelineDurationMs(pipelineDurationMs);
 
@@ -71,13 +69,38 @@ public class AnalysisRecordService {
 
         long total = repository.count();
         Double avgRisk = repository.findAverageRiskScore();
-        List<AnalysisRecord> highRisk = repository.findByRiskLevelOrderByRiskScoreDesc("HIGH");
         List<AnalysisRecord> blocked = repository.findByReleaseRecommendationOrderByAnalyzedAtDesc("Block");
         List<Object[]> mostAnalyzed = repository.findMostAnalyzedIssues();
 
+        // Risk level distribution — real counts from DB
+        Map<String, Long> riskDistribution = new HashMap<>();
+        riskDistribution.put("HIGH", 0L);
+        riskDistribution.put("MEDIUM", 0L);
+        riskDistribution.put("LOW", 0L);
+        for (Object[] row : repository.countByRiskLevel()) {
+            String level = (String) row[0];
+            Long count = (Long) row[1];
+            if (level != null) riskDistribution.put(level, count);
+        }
+
+        // Release recommendation distribution — real counts from DB
+        Map<String, Long> releaseDistribution = new HashMap<>();
+        releaseDistribution.put("Block", 0L);
+        releaseDistribution.put("Caution", 0L);
+        releaseDistribution.put("Go", 0L);
+        for (Object[] row : repository.countByReleaseRecommendation()) {
+            String rec = (String) row[0];
+            Long count = (Long) row[1];
+            if (rec != null) releaseDistribution.put(rec, count);
+        }
+
         summary.put("totalAnalyses", total);
         summary.put("averageRiskScore", avgRisk != null ? Math.round(avgRisk) : 0);
-        summary.put("highRiskCount", highRisk.size());
+        summary.put("highRiskCount", riskDistribution.get("HIGH"));
+        summary.put("mediumRiskCount", riskDistribution.get("MEDIUM"));
+        summary.put("lowRiskCount", riskDistribution.get("LOW"));
+        summary.put("riskDistribution", riskDistribution);
+        summary.put("releaseDistribution", releaseDistribution);
         summary.put("blockedCount", blocked.size());
         summary.put("mostAnalyzedIssues", mostAnalyzed.stream()
                 .limit(5)

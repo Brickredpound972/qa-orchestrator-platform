@@ -7,7 +7,7 @@
 ![LLM](https://img.shields.io/badge/LLM-Groq%20%2F%20Llama%203.3-purple)
 ![DB](https://img.shields.io/badge/DB-PostgreSQL-blue)
 
-**QA Orchestrator Platform** is an AI-powered QA decision engine that automatically analyzes Jira tickets and produces structured QA intelligence — requirement analysis, test cases, automation strategy, risk scoring, bug report templates, and historical intelligence.
+**QA Orchestrator Platform** is an AI-powered QA decision engine that automatically analyzes Jira tickets and produces structured QA intelligence — requirement analysis, test cases, automation strategy, risk scoring, and bug report templates.
 
 The system is fully automated: when a developer moves a ticket to **"In Progress"**, Jira fires a webhook, the pipeline runs, and results appear on the dashboard — with zero manual steps.
 
@@ -30,7 +30,7 @@ Developer moves ticket to "In Progress"
         ↓
 Jira fires webhook → POST /qa/webhook/jira
         ↓
-Pipeline runs automatically (no manual step)
+Pipeline runs automatically
         ↓
 Stage 1 — Requirement Analysis
 Stage 2 — Test Design
@@ -57,14 +57,28 @@ Jira (webhook) / Copilot Studio / Power Automate
      Spring Boot Service
        │           │           │
        ▼           ▼           ▼
-  Jira REST    Groq LLM    PostgreSQL
+  Jira REST    LLM API     PostgreSQL
+  (tickets)  (Groq/Azure    (history &
+              /AWS)         intelligence)
 ```
+
+---
+
+## LLM Provider Support
+
+The pipeline is provider-agnostic. Switch providers by changing a single env var — no code change needed.
+
+| Provider | Env Var | Model | Best For |
+|----------|---------|-------|----------|
+| Groq (default) | `LLM_PROVIDER=groq` | Llama 3.3 70B | Development, free tier |
+| Azure OpenAI | `LLM_PROVIDER=azure` | GPT-4o | Enterprise, Microsoft ecosystem |
+| AWS Bedrock | `LLM_PROVIDER=aws` | Claude 3.5 Sonnet | Enterprise, AWS ecosystem |
 
 ---
 
 ## QA Analysis Pipeline
 
-All 5 stages are LLM-powered (Groq / Llama 3.3 70B).
+All 5 stages are LLM-powered. Each stage reads from the previous stage output.
 
 | Stage | Input | Output |
 |-------|-------|--------|
@@ -72,7 +86,7 @@ All 5 stages are LLM-powered (Groq / Llama 3.3 70B).
 | Test Design | Requirement stage output | testScenarios, testCases |
 | Automation Decision | Test case distribution + risk | automationRecommendation, coverageSplit, framework |
 | Risk Analysis | All previous stages | riskScore, riskLevel, releaseRecommendation |
-| Bug Report | Full pipeline context | bug report template ready for QA engineer |
+| Bug Report | Full pipeline context | bug report template |
 
 ---
 
@@ -81,8 +95,8 @@ All 5 stages are LLM-powered (Groq / Llama 3.3 70B).
 Available at `/qa/dashboard`:
 
 - Total analyses, average risk score, high risk count, blocked releases
-- Risk distribution chart (High / Medium / Low)
-- Release decision chart (Block / Caution / Go)
+- Risk distribution chart — real counts from DB (High / Medium / Low)
+- Release decision chart — real counts from DB (Block / Caution / Go)
 - Recent analyses table with risk badges
 - Blocked tickets list with automation strategy
 
@@ -90,7 +104,7 @@ Available at `/qa/dashboard`:
 
 ## Jira Webhook
 
-Fully automated trigger — no manual API calls needed.
+Fully automated — no manual API calls needed.
 
 **Setup:**
 1. Jira → System → WebHooks → Create a WebHook
@@ -98,7 +112,7 @@ Fully automated trigger — no manual API calls needed.
 3. Event: `Issue updated`
 4. JQL: `project = PROJ`
 
-When a ticket moves to **"In Progress"**, the pipeline runs automatically.
+When a ticket moves to **"In Progress"** the pipeline runs automatically.
 
 ---
 
@@ -120,7 +134,7 @@ When a ticket moves to **"In Progress"**, the pipeline runs automatically.
 
 ## Input Validation
 
-`issueKey` must follow Jira format: `PROJECT-NUMBER` (e.g. `PROJ-4`, `QA-123`).
+`issueKey` must follow Jira format: `PROJECT-NUMBER` (e.g. `PROJ-4`).
 
 Invalid input returns:
 
@@ -151,7 +165,7 @@ Invalid input returns:
 | Layer | Technology |
 |-------|-----------|
 | Backend | Java 17, Spring Boot 3, Maven |
-| LLM | Groq API (Llama 3.3 70B) |
+| LLM | Groq (default) / Azure OpenAI / AWS Bedrock |
 | Database | PostgreSQL (Render) |
 | Infrastructure | Docker, Render |
 | Integrations | Jira REST API, Jira Webhooks, Microsoft Copilot Studio, Power Automate |
@@ -165,7 +179,14 @@ Invalid input returns:
 | `JIRA_BASE_URL` | Yes | Jira instance URL |
 | `JIRA_EMAIL` | Yes | Jira account email |
 | `JIRA_API_TOKEN` | Yes | Jira API token |
-| `GROQ_API_KEY` | Yes | Groq API key |
+| `GROQ_API_KEY` | Yes (if Groq) | Groq API key |
+| `AZURE_OPENAI_KEY` | Yes (if Azure) | Azure OpenAI key |
+| `AZURE_OPENAI_ENDPOINT` | Yes (if Azure) | Azure OpenAI endpoint |
+| `AZURE_OPENAI_DEPLOYMENT` | No | Model deployment name (default: gpt-4o) |
+| `AWS_ACCESS_KEY` | Yes (if AWS) | AWS access key |
+| `AWS_SECRET_KEY` | Yes (if AWS) | AWS secret key |
+| `AWS_REGION` | No | AWS region (default: us-east-1) |
+| `LLM_PROVIDER` | No | groq / azure / aws (default: groq) |
 | `SPRING_DATASOURCE_URL` | Yes | PostgreSQL JDBC URL |
 | `SPRING_DATASOURCE_USERNAME` | Yes | PostgreSQL username |
 | `SPRING_DATASOURCE_PASSWORD` | Yes | PostgreSQL password |
@@ -180,6 +201,7 @@ export JIRA_BASE_URL=https://your-domain.atlassian.net
 export JIRA_EMAIL=your-email@example.com
 export JIRA_API_TOKEN=your-jira-api-token
 export GROQ_API_KEY=gsk_...
+export LLM_PROVIDER=groq
 export SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/qa_orchestrator_db
 export SPRING_DATASOURCE_USERNAME=postgres
 export SPRING_DATASOURCE_PASSWORD=your-password
@@ -198,5 +220,5 @@ export SPRING_DATASOURCE_PASSWORD=your-password
 | Phase 3 | ✅ Complete | Structured logging, health endpoint, error handling, retry logic |
 | Phase 4 | ✅ Complete | Input validation, timeout protection, Jira error handling, logging cleanup |
 | Phase 5 | ✅ Complete | PostgreSQL persistence, history API, intelligence endpoints, dashboard |
-| Phase 6 | ✅ Complete | Jira webhook — fully automated, zero manual steps |
-| Phase 7 | 📋 Planned | Coverage tracking, risk trends, historical bug analysis, dashboard improvements |
+| Phase 6 | ✅ Complete | Jira webhook automation, LLM provider abstraction (Groq/Azure/AWS) |
+| Phase 7 | 📋 Planned | Coverage tracking, risk trends, historical bug analysis, multi-tenant support |

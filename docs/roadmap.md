@@ -31,7 +31,7 @@
 - Pipeline-level timeout (25s via CompletableFuture)
 - Jira 404 clean error response
 - Jira comment toggle (jira.comment-enabled flag)
-- System.out.println → SLF4J logging throughout
+- SLF4J logging throughout (no System.out.println)
 - JPA open-in-view disabled
 
 ## Phase 5 — QA Intelligence Layer ✅ Complete
@@ -41,17 +41,19 @@
 - Intelligence endpoints — summary, high-risk, blocked tickets
 - Health endpoint enriched with intelligence summary
 - QA Intelligence Dashboard at `/qa/dashboard`
-- Risk distribution and release decision charts
+- Real risk distribution and release decision charts
 
-## Phase 6 — Jira Webhook Automation ✅ Complete
+## Phase 6 — Automation & Provider Flexibility ✅ Complete
 - Jira webhook endpoint (`POST /qa/webhook/jira`)
 - Auto-trigger analysis when ticket moves to "In Progress"
-- Status filtering — only "In Progress" triggers pipeline
-- JQL filter — scoped to PROJ project
-- Zero manual steps — developer changes status, QA analysis runs automatically
+- Zero manual steps — developer changes status, pipeline runs
+- LlmClient interface — provider agnostic pipeline
+- GroqClient, AzureOpenAiClient, AwsBedrockClient implementations
+- Switch provider via `LLM_PROVIDER` env var (groq / azure / aws)
 
 ## Phase 7 — Extended QA Lifecycle 📋 Planned
 - Coverage tracking across test suites
 - Risk trend analysis — how risk evolves across re-analyses
 - Historical bug analysis for smarter risk scoring
 - Dashboard improvements — drill-down, filtering, search
+- Multi-tenant support — per-customer isolation

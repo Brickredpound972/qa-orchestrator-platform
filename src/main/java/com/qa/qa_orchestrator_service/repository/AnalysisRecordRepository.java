@@ -13,20 +13,21 @@ public interface AnalysisRecordRepository extends JpaRepository<AnalysisRecord, 
 
     List<AnalysisRecord> findTop10ByOrderByAnalyzedAtDesc();
 
-    // High risk tickets
     List<AnalysisRecord> findByRiskLevelOrderByRiskScoreDesc(String riskLevel);
 
-    // Block recommendations
     List<AnalysisRecord> findByReleaseRecommendationOrderByAnalyzedAtDesc(String releaseRecommendation);
 
-    // Average risk score across all analyses
     @Query("SELECT AVG(a.riskScore) FROM AnalysisRecord a")
     Double findAverageRiskScore();
 
-    // Most analyzed tickets
     @Query("SELECT a.issueKey, COUNT(a) as cnt FROM AnalysisRecord a GROUP BY a.issueKey ORDER BY cnt DESC")
     List<Object[]> findMostAnalyzedIssues();
 
-    // Total analysis count
+    @Query("SELECT a.riskLevel, COUNT(a) FROM AnalysisRecord a GROUP BY a.riskLevel")
+    List<Object[]> countByRiskLevel();
+
+    @Query("SELECT a.releaseRecommendation, COUNT(a) FROM AnalysisRecord a GROUP BY a.releaseRecommendation")
+    List<Object[]> countByReleaseRecommendation();
+
     long count();
 }
