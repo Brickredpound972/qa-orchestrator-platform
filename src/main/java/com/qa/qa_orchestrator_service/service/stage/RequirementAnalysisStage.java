@@ -2,7 +2,7 @@ package com.qa.qa_orchestrator_service.service.stage;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.qa.qa_orchestrator_service.service.llm.GroqClient;
+import com.qa.qa_orchestrator_service.service.llm.LlmClient;
 import com.qa.qa_orchestrator_service.model.QaAnalysisResult;
 import com.qa.qa_orchestrator_service.model.RequirementStageArtifact;
 import org.springframework.stereotype.Component;
@@ -10,28 +10,19 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * RequirementAnalysisStage — LLM-powered (Groq)
- *
- * Replaces keyword matching with real AI reasoning.
- */
 @Component
 public class RequirementAnalysisStage {
 
     private static final String SYSTEM_PROMPT = """
             You are a senior QA engineer performing requirement analysis on a Jira issue.
-
             Your job is to analyze the provided Jira issue and return a structured JSON object.
-
             RULES:
             - Return ONLY valid JSON. No markdown, no explanation, no code blocks.
-            - If the issue lacks enough detail to test (missing acceptance criteria, missing feature behavior,
-              missing scope), set status to "BLOCKED".
+            - If the issue lacks enough detail to test, set status to "BLOCKED".
             - If the issue is sufficiently clear, set status to "READY".
             - Be specific and concrete. Do not invent requirements not present in the issue.
             - edgeCases must include boundary conditions, invalid inputs, and state-related edge cases.
             - openQuestions must be real gaps that would block test execution.
-
             REQUIRED JSON STRUCTURE:
             {
               "status": "READY" or "BLOCKED",
@@ -44,34 +35,27 @@ public class RequirementAnalysisStage {
             }
             """;
 
-    private final GroqClient groqClient;
+    private final LlmClient llmClient;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public RequirementAnalysisStage(GroqClient groqClient) {
-        this.groqClient = groqClient;
+    public RequirementAnalysisStage(LlmClient llmClient) {
+        this.llmClient = llmClient;
     }
 
     public void apply(QaAnalysisResult result, String jiraIssueJson) {
         try {
-            String groqResponse = groqClient.call(SYSTEM_PROMPT, jiraIssueJson);
-            RequirementStageArtifact artifact = parseResponse(groqResponse);
+            String response = llmClient.call(SYSTEM_PROMPT, jiraIssueJson);
+            RequirementStageArtifact artifact = parseResponse(response);
             applyToResult(result, artifact);
-
         } catch (Exception e) {
-            RequirementStageArtifact fallback = buildFallbackArtifact(e.getMessage());
-            applyToResult(result, fallback);
+            applyToResult(result, buildFallbackArtifact(e.getMessage()));
         }
     }
 
     private RequirementStageArtifact parseResponse(String raw) {
         try {
-            String cleaned = raw
-                    .replaceAll("(?s)```json\\s*", "")
-                    .replaceAll("(?s)```\\s*", "")
-                    .trim();
-
+            String cleaned = raw.replaceAll("(?s)```json\\s*", "").replaceAll("(?s)```\\s*", "").trim();
             JsonNode node = objectMapper.readTree(cleaned);
-
             RequirementStageArtifact artifact = new RequirementStageArtifact();
             artifact.setStatus(node.path("status").asText("UNKNOWN"));
             artifact.setFeatureSummary(node.path("featureSummary").asText(""));
@@ -80,11 +64,9 @@ public class RequirementAnalysisStage {
             artifact.setOpenQuestions(toStringList(node.path("openQuestions")));
             artifact.setScope(toStringList(node.path("scope")));
             artifact.setOutOfScope(toStringList(node.path("outOfScope")));
-
             return artifact;
-
         } catch (Exception e) {
-            throw new RuntimeException("Failed to parse Groq requirement response: " + e.getMessage(), e);
+            throw new RuntimeException("Failed to parse requirement response: " + e.getMessage(), e);
         }
     }
 
@@ -114,9 +96,7 @@ public class RequirementAnalysisStage {
     private List<String> toStringList(JsonNode arrayNode) {
         List<String> items = new ArrayList<>();
         if (arrayNode.isArray()) {
-            for (JsonNode item : arrayNode) {
-                items.add(item.asText());
-            }
+            for (JsonNode item : arrayNode) items.add(item.asText());
         }
         return items;
     }

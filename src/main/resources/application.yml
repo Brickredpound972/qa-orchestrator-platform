@@ -13,14 +13,35 @@ spring:
       ddl-auto: update
     show-sql: false
 
+# LLM Provider — set LLM_PROVIDER env var to switch
+# groq  → Groq API (default, free tier available)
+# azure → Azure OpenAI (GPT-4o, enterprise)
+# aws   → AWS Bedrock (Claude 3.5, enterprise)
+llm:
+  provider: ${LLM_PROVIDER:groq}
+
+# Groq (default)
+groq:
+  api-key: ${GROQ_API_KEY:}
+
+# Azure OpenAI
+azure:
+  openai:
+    key: ${AZURE_OPENAI_KEY:}
+    endpoint: ${AZURE_OPENAI_ENDPOINT:}
+    deployment: ${AZURE_OPENAI_DEPLOYMENT:gpt-4o}
+
+# AWS Bedrock
+aws:
+  access-key: ${AWS_ACCESS_KEY:}
+  secret-key: ${AWS_SECRET_KEY:}
+  region: ${AWS_REGION:us-east-1}
+
 jira:
   base-url: ${JIRA_BASE_URL}
   email: ${JIRA_EMAIL}
   api-token: ${JIRA_API_TOKEN}
   comment-enabled: ${JIRA_COMMENT_ENABLED:false}
-
-groq:
-  api-key: ${GROQ_API_KEY}
 
 logging:
   level:

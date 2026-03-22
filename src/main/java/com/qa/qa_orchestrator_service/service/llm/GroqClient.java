@@ -4,20 +4,28 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * GroqClient
+ *
+ * LLM provider: Groq (Llama 3.3 70B)
+ * Active when: LLM_PROVIDER=groq (default)
+ */
 @Component
-public class GroqClient {
+@ConditionalOnProperty(name = "llm.provider", havingValue = "groq", matchIfMissing = true)
+public class GroqClient implements LlmClient {
 
     private static final Logger log = LoggerFactory.getLogger(GroqClient.class);
 
@@ -39,40 +47,32 @@ public class GroqClient {
                 .build();
     }
 
+    @Override
     public String call(String systemPrompt, String userContent) {
         int attempts = 0;
 
         while (attempts < MAX_RETRIES) {
             try {
                 return doCall(systemPrompt, userContent);
-
             } catch (HttpClientErrorException e) {
                 if (e.getStatusCode().value() == 429) {
                     attempts++;
                     if (attempts < MAX_RETRIES) {
                         log.warn("[GROQ] Rate limit hit, retrying in {}s... (attempt {}/{})",
                                 RETRY_DELAY_MS / 1000, attempts, MAX_RETRIES);
-                        try {
-                            Thread.sleep(RETRY_DELAY_MS);
-                        } catch (InterruptedException ie) {
-                            Thread.currentThread().interrupt();
-                            throw new RuntimeException("Retry interrupted", ie);
-                        }
+                        try { Thread.sleep(RETRY_DELAY_MS); }
+                        catch (InterruptedException ie) { Thread.currentThread().interrupt(); throw new RuntimeException("Retry interrupted", ie); }
                     } else {
-                        throw new RuntimeException("Groq rate limit exceeded after " + MAX_RETRIES + " retries: " + e.getMessage(), e);
+                        throw new RuntimeException("Groq rate limit exceeded after " + MAX_RETRIES + " retries", e);
                     }
                 } else {
                     throw new RuntimeException("Groq API call failed: " + e.getMessage(), e);
                 }
-
             } catch (ResourceAccessException e) {
-                throw new RuntimeException("Groq API call timed out after 30 seconds. Please try again.", e);
-            } catch (Exception e) {
-                throw new RuntimeException("Groq API call failed: " + e.getMessage(), e);
+                throw new RuntimeException("Groq API timed out after 30 seconds", e);
             }
         }
-
-        throw new RuntimeException("Groq API call failed after " + MAX_RETRIES + " retries");
+        throw new RuntimeException("Groq API failed after " + MAX_RETRIES + " retries");
     }
 
     private String doCall(String systemPrompt, String userContent) {
@@ -80,35 +80,27 @@ public class GroqClient {
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setBearerAuth(apiKey);
 
-        Map<String, Object> systemMessage = Map.of("role", "system", "content", systemPrompt);
-        Map<String, Object> userMessage = Map.of("role", "user", "content", userContent);
-
         Map<String, Object> requestBody = Map.of(
                 "model", MODEL,
-                "messages", List.of(systemMessage, userMessage),
+                "messages", List.of(
+                        Map.of("role", "system", "content", systemPrompt),
+                        Map.of("role", "user", "content", userContent)
+                ),
                 "max_tokens", 2048,
                 "temperature", 0.2
         );
 
-        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
-
         ResponseEntity<String> response = restTemplate.exchange(
-                GROQ_API_URL, HttpMethod.POST, entity, String.class);
+                GROQ_API_URL, HttpMethod.POST,
+                new HttpEntity<>(requestBody, headers), String.class);
 
-        return extractTextFromResponse(response.getBody());
+        return extractText(response.getBody());
     }
 
-    private String extractTextFromResponse(String responseBody) {
+    private String extractText(String responseBody) {
         try {
-            JsonNode root = objectMapper.readTree(responseBody);
-            JsonNode choices = root.path("choices");
-
-            if (choices.isArray() && choices.size() > 0) {
-                return choices.get(0).path("message").path("content").asText();
-            }
-
-            throw new RuntimeException("Unexpected Groq response structure: " + responseBody);
-
+            JsonNode root = new ObjectMapper().readTree(responseBody);
+            return root.path("choices").get(0).path("message").path("content").asText();
         } catch (Exception e) {
             throw new RuntimeException("Failed to parse Groq response: " + e.getMessage(), e);
         }
