@@ -16,7 +16,6 @@ import java.util.Map;
 public class AnalysisRecordService {
 
     private static final Logger log = LoggerFactory.getLogger(AnalysisRecordService.class);
-
     private final AnalysisRecordRepository repository;
 
     public AnalysisRecordService(AnalysisRecordRepository repository) {
@@ -36,15 +35,26 @@ public class AnalysisRecordService {
             record.setTestCaseCount(result.getTestCases() != null ? result.getTestCases().size() : 0);
             record.setAnalyzedAt(Instant.now());
             record.setPipelineDurationMs(pipelineDurationMs);
-
             repository.save(record);
             log.info("[DB] Analysis record saved for {} | risk={} | score={} | testCases={}",
                     result.getTraceabilityId(), result.getRiskLevel(),
                     result.getRiskScore(), record.getTestCaseCount());
-
         } catch (Exception e) {
             log.warn("[DB] Failed to save analysis record for {}: {}",
                     result.getTraceabilityId(), e.getMessage());
+        }
+    }
+
+    public void markAsCompleted(String issueKey, String releaseSummary) {
+        try {
+            repository.findTopByIssueKeyOrderByAnalyzedAtDesc(issueKey).ifPresent(record -> {
+                record.setCompletedAt(Instant.now());
+                record.setReleaseSummary(releaseSummary);
+                repository.save(record);
+                log.info("[DB] Marked {} as completed with release summary", issueKey);
+            });
+        } catch (Exception e) {
+            log.warn("[DB] Failed to mark {} as completed: {}", issueKey, e.getMessage());
         }
     }
 
@@ -64,15 +74,17 @@ public class AnalysisRecordService {
         return repository.findByReleaseRecommendationOrderByAnalyzedAtDesc("Block");
     }
 
+    public List<AnalysisRecord> getReleasedTickets() {
+        return repository.findByCompletedAtIsNotNullOrderByCompletedAtDesc();
+    }
+
     public Map<String, Object> getSummary() {
         Map<String, Object> summary = new HashMap<>();
-
         long total = repository.count();
         Double avgRisk = repository.findAverageRiskScore();
         List<AnalysisRecord> blocked = repository.findByReleaseRecommendationOrderByAnalyzedAtDesc("Block");
         List<Object[]> mostAnalyzed = repository.findMostAnalyzedIssues();
 
-        // Risk level distribution — real counts from DB
         Map<String, Long> riskDistribution = new HashMap<>();
         riskDistribution.put("HIGH", 0L);
         riskDistribution.put("MEDIUM", 0L);
@@ -83,7 +95,6 @@ public class AnalysisRecordService {
             if (level != null) riskDistribution.put(level, count);
         }
 
-        // Release recommendation distribution — real counts from DB
         Map<String, Long> releaseDistribution = new HashMap<>();
         releaseDistribution.put("Block", 0L);
         releaseDistribution.put("Caution", 0L);
@@ -102,6 +113,7 @@ public class AnalysisRecordService {
         summary.put("riskDistribution", riskDistribution);
         summary.put("releaseDistribution", releaseDistribution);
         summary.put("blockedCount", blocked.size());
+        summary.put("releasedCount", repository.findByCompletedAtIsNotNullOrderByCompletedAtDesc().size());
         summary.put("mostAnalyzedIssues", mostAnalyzed.stream()
                 .limit(5)
                 .map(row -> Map.of("issueKey", row[0], "count", row[1]))

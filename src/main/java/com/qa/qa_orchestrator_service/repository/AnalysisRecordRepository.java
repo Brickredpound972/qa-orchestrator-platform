@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface AnalysisRecordRepository extends JpaRepository<AnalysisRecord, Long> {
@@ -16,6 +17,10 @@ public interface AnalysisRecordRepository extends JpaRepository<AnalysisRecord, 
     List<AnalysisRecord> findByRiskLevelOrderByRiskScoreDesc(String riskLevel);
 
     List<AnalysisRecord> findByReleaseRecommendationOrderByAnalyzedAtDesc(String releaseRecommendation);
+
+    List<AnalysisRecord> findByCompletedAtIsNotNullOrderByCompletedAtDesc();
+
+    Optional<AnalysisRecord> findTopByIssueKeyOrderByAnalyzedAtDesc(String issueKey);
 
     @Query("SELECT AVG(a.riskScore) FROM AnalysisRecord a")
     Double findAverageRiskScore();
