@@ -33,12 +33,13 @@ public class DashboardController {
   .metric-value.blue { color: #1a6ef5; }
   .metric-value.red { color: #dc2626; }
   .metric-value.amber { color: #d97706; }
+  .metric-value.green { color: #16a34a; }
   .section { background: #fff; border-radius: 10px; border: 1px solid #e8e8e8; margin-bottom: 1.5rem; overflow: hidden; }
   .section-header { padding: 1rem 1.5rem; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; justify-content: space-between; }
   .section-title { font-size: 14px; font-weight: 500; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   th { text-align: left; padding: 10px 1.5rem; font-size: 11px; color: #888; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; background: #fafafa; border-bottom: 1px solid #f0f0f0; }
-  td { padding: 12px 1.5rem; border-bottom: 1px solid #f8f8f8; }
+  td { padding: 12px 1.5rem; border-bottom: 1px solid #f8f8f8; vertical-align: top; }
   tr:last-child td { border-bottom: none; }
   tr:hover td { background: #fafafa; }
   .badge-HIGH { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:500; background:#fee2e2; color:#991b1b; }
@@ -47,6 +48,11 @@ public class DashboardController {
   .badge-Block { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:500; background:#fee2e2; color:#991b1b; }
   .badge-Caution { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:500; background:#fef3c7; color:#92400e; }
   .badge-Go { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:500; background:#dcfce7; color:#166534; }
+  .verdict { font-size: 12px; font-weight: 500; margin-bottom: 4px; }
+  .verdict.approved { color: #16a34a; }
+  .verdict.risk { color: #d97706; }
+  .verdict.missing { color: #dc2626; }
+  .summary-text { font-size: 12px; color: #555; line-height: 1.5; max-width: 500px; white-space: pre-wrap; }
   .chart-wrap { padding: 1.5rem; }
   .loading { text-align: center; padding: 3rem; color: #888; font-size: 14px; }
   .refresh-btn { background: none; border: 1px solid #ddd; border-radius: 6px; padding: 4px 12px; font-size: 12px; cursor: pointer; color: #555; }
@@ -84,6 +90,10 @@ public class DashboardController {
     <div class="section-header"><span class="section-title">Blocked tickets</span></div>
     <div id="blocked-table"><div class="loading">Loading...</div></div>
   </div>
+  <div class="section">
+    <div class="section-header"><span class="section-title">Released tickets — QA summaries</span></div>
+    <div id="released-table"><div class="loading">Loading...</div></div>
+  </div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script>
@@ -94,6 +104,20 @@ function fmt(ts) {
   const d = new Date(ts);
   return d.toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'}) + ' ' +
          d.toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'});
+}
+
+function verdictClass(summary) {
+  if (!summary) return '';
+  const s = summary.toUpperCase();
+  if (s.startsWith('APPROVED WITH RISK')) return 'risk';
+  if (s.startsWith('APPROVED')) return 'approved';
+  if (s.startsWith('RELEASED WITHOUT')) return 'missing';
+  return '';
+}
+
+function verdictLine(summary) {
+  if (!summary) return '-';
+  return summary.split('\\n')[0];
 }
 
 async function loadSummary() {
@@ -110,12 +134,12 @@ async function loadSummary() {
       <div class="metric-value amber">${Math.round(d.averageRiskScore)}</div>
     </div>
     <div class="metric-card">
-      <div class="metric-label">High risk tickets</div>
-      <div class="metric-value red">${d.highRiskCount}</div>
-    </div>
-    <div class="metric-card">
       <div class="metric-label">Blocked releases</div>
       <div class="metric-value red">${d.blockedCount}</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Released tickets</div>
+      <div class="metric-value green">${d.releasedCount || 0}</div>
     </div>
   `;
 
@@ -124,7 +148,7 @@ async function loadSummary() {
   riskChartInst = new Chart(document.getElementById('riskChart'), {
     type: 'doughnut',
     data: {
-      labels: ['High', 'Medium', 'Low'],
+      labels: ['High','Medium','Low'],
       datasets: [{ data: [rd.HIGH||0, rd.MEDIUM||0, rd.LOW||0], backgroundColor: ['#dc2626','#d97706','#16a34a'], borderWidth: 0 }]
     },
     options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom', labels:{ font:{size:12}, boxWidth:12 } } } }
@@ -149,7 +173,7 @@ async function loadHistory() {
   const rows = data.map(r => `
     <tr>
       <td><strong>${r.issueKey}</strong></td>
-      <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.featureSummary||'-'}</td>
+      <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.featureSummary||'-'}</td>
       <td><span class="badge-${r.riskLevel}">${r.riskLevel||'-'}</span></td>
       <td>${r.riskScore??'-'}</td>
       <td><span class="badge-${r.releaseRecommendation}">${r.releaseRecommendation||'-'}</span></td>
@@ -182,8 +206,29 @@ async function loadBlocked() {
     </table>`;
 }
 
+async function loadReleased() {
+  const res = await fetch('/qa/api/v1/intelligence/released');
+  const data = await res.json();
+  if (!data.length) { document.getElementById('released-table').innerHTML='<div class="loading">No released tickets yet</div>'; return; }
+  const rows = data.map(r => `
+    <tr>
+      <td><strong>${r.issueKey}</strong></td>
+      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.featureSummary||'-'}</td>
+      <td><span class="badge-${r.riskLevel}">${r.riskLevel||'-'}</span></td>
+      <td>
+        <div class="verdict ${verdictClass(r.releaseSummary)}">${verdictLine(r.releaseSummary)}</div>
+      </td>
+      <td class="ts">${fmt(r.completedAt)}</td>
+    </tr>`).join('');
+  document.getElementById('released-table').innerHTML = `
+    <table>
+      <thead><tr><th>Issue</th><th>Feature</th><th>Risk</th><th>QA Verdict</th><th>Released</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
 async function loadAll() {
-  try { await Promise.all([loadSummary(), loadHistory(), loadBlocked()]); }
+  try { await Promise.all([loadSummary(), loadHistory(), loadBlocked(), loadReleased()]); }
   catch(e) { console.error(e); }
 }
 
