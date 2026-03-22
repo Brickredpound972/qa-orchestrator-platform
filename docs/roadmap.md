@@ -29,17 +29,21 @@
 - application.yml cleanup
 - Render sleep prevention (cron-job on /qa/health)
 
-## Phase 4 — Hardening & Quality 🔄 In Progress
+## Phase 4 — Hardening & Quality ✅ Complete
 
 - Input validation (issueKey format enforcement)
-- Request/response sanitization
-- Improved Jira error messages
-- Pipeline timeout protection
-- Coverage tracking foundations
+- Groq client timeout (30s read, 10s connect)
+- Jira client timeout (15s read, 10s connect)
+- Pipeline-level timeout (25s via CompletableFuture)
+- Jira 404 — clean error response
+- Jira comment toggle (jira.comment-enabled flag)
+- System.out.println → SLF4J logging throughout
+- Validated across 3 domains (Login, Coupon, Shopping Cart)
 
-## Phase 5 — QA Intelligence Layer (Planned)
+## Phase 5 — QA Intelligence Layer 📋 Planned
 
 - Historical bug analysis
 - Coverage-based risk scoring
-- Release decision engine
+- Release decision engine improvements
 - QA insights dashboard
+- Test execution planning

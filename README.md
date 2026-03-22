@@ -56,7 +56,7 @@ User / Copilot Studio / Power Automate
 
 ## QA Analysis Pipeline
 
-All 5 stages are LLM-powered. Each stage reads from the previous stage output — they are not independent.
+All 5 stages are LLM-powered. Each stage reads from the previous stage output.
 
 ### Stage 1 — Requirement Analysis
 Reads the raw Jira JSON. Produces:
@@ -74,7 +74,7 @@ Reads clarified requirements and edge cases from Stage 1. Produces:
 
 ### Stage 3 — Automation Decision
 Reads test case types (UI/API/E2E counts) and risk level. Produces:
-- `automationRecommendation` (Manual / UI-heavy / API-heavy / Hybrid)
+- `automationRecommendation`
 - `automationReasoning`
 - `coverageSplit`
 - `frameworkSuggestion`
@@ -89,8 +89,7 @@ Reads all previous stage outputs. Produces:
 
 ### Stage 5 — Bug Report
 Reads full pipeline context. Produces:
-- `title`
-- `severity` / `priority`
+- `title`, `severity`, `priority`
 - `reproductionSteps`
 - `expectedResult` / `actualResult`
 - `impactSummary`
@@ -100,8 +99,6 @@ Reads full pipeline context. Produces:
 ---
 
 ## Live API
-
-Production endpoint:
 
 ```
 https://qa-orchestrator-service.onrender.com
@@ -129,7 +126,7 @@ curl -X POST https://qa-orchestrator-service.onrender.com/qa/api/v1/qa/analyze \
 
 ```json
 {
-  "output": "Requirement status: READY. Automation: Hybrid (UI + API). Risk: MEDIUM (60). Release decision: Caution.",
+  "output": "...",
   "analysis": {
     "traceabilityId": "PROJ-4",
     "contractVersion": "v2",
@@ -137,29 +134,19 @@ curl -X POST https://qa-orchestrator-service.onrender.com/qa/api/v1/qa/analyze \
     "stages": {
       "requirement": {
         "status": "READY",
-        "featureSummary": "Apply a coupon code during checkout to receive a discount on the order total.",
-        "clarifiedRequirements": ["Valid coupon applies discount to subtotal before tax", "..."],
-        "edgeCases": ["Expired coupon code", "Empty coupon field", "..."],
-        "openQuestions": ["What is the format of a valid coupon code?", "..."]
+        "featureSummary": "...",
+        "clarifiedRequirements": ["..."],
+        "edgeCases": ["..."],
+        "openQuestions": ["..."]
       },
       "testDesign": {
-        "testScenarios": ["Valid Coupon Application", "Invalid Coupon", "..."],
-        "testCases": [
-          {
-            "id": "TC-01",
-            "title": "Apply Valid Coupon Code",
-            "steps": ["Enter valid coupon", "Click apply", "Verify discount"],
-            "expectedResult": "Discount applied to subtotal",
-            "testType": "UI",
-            "suiteTag": "Smoke",
-            "priority": "High"
-          }
-        ]
+        "testScenarios": ["..."],
+        "testCases": [{ "id": "TC-01", "title": "...", "testType": "UI", "priority": "High" }]
       },
       "automation": {
-        "automationRecommendation": "Automation (UI-heavy)",
-        "coverageSplit": "UI 100% / API 0%",
-        "frameworkSuggestion": "Selenium + TestNG (Java) or Playwright (TypeScript)"
+        "automationRecommendation": "Hybrid (UI + API)",
+        "coverageSplit": "UI 60% / API 40%",
+        "frameworkSuggestion": "Java + Selenium + TestNG + REST Assured"
       },
       "risk": {
         "riskScore": 60,
@@ -167,12 +154,9 @@ curl -X POST https://qa-orchestrator-service.onrender.com/qa/api/v1/qa/analyze \
         "releaseRecommendation": "Caution"
       },
       "bugReport": {
-        "title": "Coupon Code Application Failure During Checkout",
+        "title": "...",
         "severity": "Medium",
         "priority": "P3",
-        "reproductionSteps": ["Enter valid coupon", "Click apply", "Verify result"],
-        "expectedResult": "Discount applied correctly",
-        "actualResult": "To be filled by QA engineer after test execution.",
         "suggestedAssignee": "Backend Developer"
       }
     }
@@ -190,6 +174,41 @@ curl -X POST https://qa-orchestrator-service.onrender.com/qa/api/v1/qa/analyze \
 | POST | `/qa/api/v1/qa/analyze` | Primary endpoint |
 | POST | `/qa/analyze` | Compatibility alias |
 | POST | `/qa/run/{issueKey}` | Legacy path endpoint |
+
+---
+
+## Input Validation
+
+The `issueKey` field is validated before the pipeline runs:
+
+- Required, non-blank
+- Max 50 characters
+- Must match Jira format: `PROJECT-NUMBER` (e.g. `PROJ-4`, `QA-123`)
+
+Invalid input returns:
+
+```json
+{
+  "status": 400,
+  "error": "Bad Request",
+  "message": "issueKey must follow Jira format: PROJECT-NUMBER (e.g. PROJ-4)"
+}
+```
+
+---
+
+## Error Responses
+
+All errors return structured JSON:
+
+| Status | Scenario |
+|--------|----------|
+| 400 | Invalid issueKey format |
+| 404 | Jira issue not found |
+| 401 | Jira authentication failed |
+| 429 | LLM rate limit reached |
+| 504 | Pipeline timed out |
+| 500 | Unexpected error |
 
 ---
 
@@ -212,6 +231,7 @@ curl -X POST https://qa-orchestrator-service.onrender.com/qa/api/v1/qa/analyze \
 | `JIRA_EMAIL` | Yes | Jira account email |
 | `JIRA_API_TOKEN` | Yes | Jira API token |
 | `GROQ_API_KEY` | Yes | Groq API key |
+| `JIRA_COMMENT_ENABLED` | No | Write analysis as Jira comment (default: false) |
 
 ---
 
@@ -225,24 +245,6 @@ export GROQ_API_KEY=gsk_...
 
 ./mvnw spring-boot:run
 ```
-
-Test:
-
-```bash
-curl -X POST http://localhost:10000/qa/api/v1/qa/analyze \
--H "Content-Type: application/json" \
--d '{"issueKey":"PROJ-4"}'
-```
-
----
-
-## API Contract
-
-Current version: `v2`
-
-Primary structured output: `analysis.stages`
-
-Top-level fields (`analysis.requirementStatus`, `analysis.riskLevel`, etc.) are retained for backward compatibility with earlier integrations.
 
 ---
 
@@ -260,6 +262,6 @@ Top-level fields (`analysis.requirementStatus`, `analysis.riskLevel`, etc.) are 
 |-------|--------|-------------|
 | Phase 1 | ✅ Complete | Spring Boot backend, Jira integration, multi-stage pipeline, Render deployment |
 | Phase 2 | ✅ Complete | LLM-powered stages, Groq integration, versioned API contract, Copilot Studio integration |
-| Phase 3 | ✅ Complete | Structured logging, health endpoint, error handling, retry logic, observability |
-| Phase 4 | 🔄 In Progress | Input validation, pipeline hardening, coverage tracking |
+| Phase 3 | ✅ Complete | Structured logging, health endpoint, error handling, retry logic |
+| Phase 4 | ✅ Complete | Input validation, timeout protection, Jira error handling, logging cleanup |
 | Phase 5 | 📋 Planned | Historical bug analysis, coverage-based risk scoring, QA insights dashboard |
