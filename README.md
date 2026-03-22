@@ -7,9 +7,9 @@
 ![LLM](https://img.shields.io/badge/LLM-Groq%20%2F%20Llama%203.3-purple)
 ![DB](https://img.shields.io/badge/DB-PostgreSQL-blue)
 
-**QA Orchestrator Platform** is an AI-powered QA decision engine that automatically analyzes Jira tickets and produces structured QA intelligence — requirement analysis, test cases, automation strategy, risk scoring, and bug report templates.
+**QA Orchestrator Platform** is an AI-powered QA decision engine that covers the full QA lifecycle — from ticket creation to release.
 
-The system is fully automated: when a developer moves a ticket to **"In Progress"**, Jira fires a webhook, the pipeline runs, and results appear on the dashboard — with zero manual steps.
+When a developer moves a ticket to **"In Progress"**, the system automatically runs a full QA analysis pipeline. When the ticket moves to **"Done"**, the system generates a final QA release summary. Everything is tracked in PostgreSQL and visualized on a live dashboard.
 
 ---
 
@@ -23,14 +23,14 @@ The system is fully automated: when a developer moves a ticket to **"In Progress
 
 ---
 
-## How It Works
+## Full QA Lifecycle
 
 ```
+Developer opens Jira ticket
+        ↓
 Developer moves ticket to "In Progress"
         ↓
-Jira fires webhook → POST /qa/webhook/jira
-        ↓
-Pipeline runs automatically
+Jira webhook fires → QA pipeline runs automatically
         ↓
 Stage 1 — Requirement Analysis
 Stage 2 — Test Design
@@ -38,9 +38,19 @@ Stage 3 — Automation Decision
 Stage 4 — Risk Analysis
 Stage 5 — Bug Report Template
         ↓
-Results saved to PostgreSQL
+Results saved to PostgreSQL + added as Jira comment
         ↓
-Intelligence Dashboard updated
+Dashboard updated — risk level, test cases, release decision
+        ↓
+Developer moves ticket to "Done"
+        ↓
+Jira webhook fires → QA Release Summary generated
+        ↓
+Verdict: APPROVED / APPROVED WITH RISK / RELEASED WITHOUT FULL COVERAGE
+        ↓
+Summary saved to PostgreSQL + added as Jira comment
+        ↓
+Dashboard — Released tickets section updated
 ```
 
 ---
@@ -66,7 +76,7 @@ Jira (webhook) / Copilot Studio / Power Automate
 
 ## LLM Provider Support
 
-The pipeline is provider-agnostic. Switch providers by changing a single env var — no code change needed.
+Switch providers by changing a single env var — no code change needed.
 
 | Provider | Env Var | Model | Best For |
 |----------|---------|-------|----------|
@@ -78,15 +88,16 @@ The pipeline is provider-agnostic. Switch providers by changing a single env var
 
 ## QA Analysis Pipeline
 
-All 5 stages are LLM-powered. Each stage reads from the previous stage output.
+All stages are LLM-powered and feed into each other.
 
 | Stage | Input | Output |
 |-------|-------|--------|
 | Requirement Analysis | Raw Jira JSON | clarifiedRequirements, edgeCases, openQuestions, scope |
-| Test Design | Requirement stage output | testScenarios, testCases |
-| Automation Decision | Test case distribution + risk | automationRecommendation, coverageSplit, framework |
+| Test Design | Requirement output | testScenarios, testCases |
+| Automation Decision | Test distribution + risk | automationRecommendation, coverageSplit, framework |
 | Risk Analysis | All previous stages | riskScore, riskLevel, releaseRecommendation |
 | Bug Report | Full pipeline context | bug report template |
+| Release Summary | Analysis history from DB | APPROVED / APPROVED WITH RISK / RELEASED WITHOUT FULL COVERAGE |
 
 ---
 
@@ -94,25 +105,27 @@ All 5 stages are LLM-powered. Each stage reads from the previous stage output.
 
 Available at `/qa/dashboard`:
 
-- Total analyses, average risk score, high risk count, blocked releases
-- Risk distribution chart — real counts from DB (High / Medium / Low)
-- Release decision chart — real counts from DB (Block / Caution / Go)
+- Total analyses, avg risk score, blocked releases, released tickets
+- Risk distribution chart (High / Medium / Low) — real DB counts
+- Release decision chart (Block / Caution / Go) — real DB counts
 - Recent analyses table with risk badges
-- Blocked tickets list with automation strategy
+- Blocked tickets list
+- **Released tickets — QA verdicts with release summary**
 
 ---
 
 ## Jira Webhook
 
-Fully automated — no manual API calls needed.
+| Status | Action |
+|--------|--------|
+| `In Progress` | Triggers full QA analysis pipeline |
+| `Done` | Triggers QA release summary generation |
 
 **Setup:**
 1. Jira → System → WebHooks → Create a WebHook
 2. URL: `https://qa-orchestrator-service.onrender.com/qa/webhook/jira`
 3. Event: `Issue updated`
 4. JQL: `project = PROJ`
-
-When a ticket moves to **"In Progress"** the pipeline runs automatically.
 
 ---
 
@@ -129,34 +142,7 @@ When a ticket moves to **"In Progress"** the pipeline runs automatically.
 | GET | `/qa/api/v1/intelligence/summary` | Aggregated intelligence summary |
 | GET | `/qa/api/v1/intelligence/high-risk` | All HIGH risk analyses |
 | GET | `/qa/api/v1/intelligence/blocked` | All blocked analyses |
-
----
-
-## Input Validation
-
-`issueKey` must follow Jira format: `PROJECT-NUMBER` (e.g. `PROJ-4`).
-
-Invalid input returns:
-
-```json
-{
-  "status": 400,
-  "error": "Bad Request",
-  "message": "issueKey must follow Jira format: PROJECT-NUMBER (e.g. PROJ-4)"
-}
-```
-
----
-
-## Error Responses
-
-| Status | Scenario |
-|--------|----------|
-| 400 | Invalid issueKey format |
-| 404 | Jira issue not found |
-| 401 | Jira authentication failed |
-| 504 | Pipeline timed out |
-| 500 | Unexpected error |
+| GET | `/qa/api/v1/intelligence/released` | All released tickets with QA summaries |
 
 ---
 
@@ -182,7 +168,7 @@ Invalid input returns:
 | `GROQ_API_KEY` | Yes (if Groq) | Groq API key |
 | `AZURE_OPENAI_KEY` | Yes (if Azure) | Azure OpenAI key |
 | `AZURE_OPENAI_ENDPOINT` | Yes (if Azure) | Azure OpenAI endpoint |
-| `AZURE_OPENAI_DEPLOYMENT` | No | Model deployment name (default: gpt-4o) |
+| `AZURE_OPENAI_DEPLOYMENT` | No | Model deployment (default: gpt-4o) |
 | `AWS_ACCESS_KEY` | Yes (if AWS) | AWS access key |
 | `AWS_SECRET_KEY` | Yes (if AWS) | AWS secret key |
 | `AWS_REGION` | No | AWS region (default: us-east-1) |
@@ -191,23 +177,6 @@ Invalid input returns:
 | `SPRING_DATASOURCE_USERNAME` | Yes | PostgreSQL username |
 | `SPRING_DATASOURCE_PASSWORD` | Yes | PostgreSQL password |
 | `JIRA_COMMENT_ENABLED` | No | Write analysis as Jira comment (default: false) |
-
----
-
-## Local Development
-
-```bash
-export JIRA_BASE_URL=https://your-domain.atlassian.net
-export JIRA_EMAIL=your-email@example.com
-export JIRA_API_TOKEN=your-jira-api-token
-export GROQ_API_KEY=gsk_...
-export LLM_PROVIDER=groq
-export SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/qa_orchestrator_db
-export SPRING_DATASOURCE_USERNAME=postgres
-export SPRING_DATASOURCE_PASSWORD=your-password
-
-./mvnw spring-boot:run
-```
 
 ---
 
@@ -220,5 +189,5 @@ export SPRING_DATASOURCE_PASSWORD=your-password
 | Phase 3 | ✅ Complete | Structured logging, health endpoint, error handling, retry logic |
 | Phase 4 | ✅ Complete | Input validation, timeout protection, Jira error handling, logging cleanup |
 | Phase 5 | ✅ Complete | PostgreSQL persistence, history API, intelligence endpoints, dashboard |
-| Phase 6 | ✅ Complete | Jira webhook automation, LLM provider abstraction (Groq/Azure/AWS) |
+| Phase 6 | ✅ Complete | Full QA lifecycle — webhook automation, release summary, LLM provider abstraction |
 | Phase 7 | 📋 Planned | Coverage tracking, risk trends, historical bug analysis, multi-tenant support |

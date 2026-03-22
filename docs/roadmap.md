@@ -31,27 +31,29 @@
 - Pipeline-level timeout (25s via CompletableFuture)
 - Jira 404 clean error response
 - Jira comment toggle (jira.comment-enabled flag)
-- SLF4J logging throughout (no System.out.println)
+- SLF4J logging throughout
 - JPA open-in-view disabled
 
 ## Phase 5 — QA Intelligence Layer ✅ Complete
 - PostgreSQL database on Render (Free tier)
 - AnalysisRecord entity — persists every pipeline result
 - History endpoints — recent analyses and per-issue history
-- Intelligence endpoints — summary, high-risk, blocked tickets
+- Intelligence endpoints — summary, high-risk, blocked, released
 - Health endpoint enriched with intelligence summary
 - QA Intelligence Dashboard at `/qa/dashboard`
 - Real risk distribution and release decision charts
 
-## Phase 6 — Automation & Provider Flexibility ✅ Complete
-- Jira webhook endpoint (`POST /qa/webhook/jira`)
-- Auto-trigger analysis when ticket moves to "In Progress"
-- Zero manual steps — developer changes status, pipeline runs
+## Phase 6 — Full QA Lifecycle Automation ✅ Complete
+- Jira webhook — auto-trigger analysis on "In Progress"
+- Jira webhook — auto-trigger release summary on "Done"
 - LlmClient interface — provider agnostic pipeline
 - GroqClient, AzureOpenAiClient, AwsBedrockClient implementations
-- Switch provider via `LLM_PROVIDER` env var (groq / azure / aws)
+- Switch provider via `LLM_PROVIDER` env var
+- Released tickets section in dashboard with QA verdict
+- completedAt + releaseSummary persisted to PostgreSQL
+- End-to-end QA lifecycle: ticket open → analysis → release summary
 
-## Phase 7 — Extended QA Lifecycle 📋 Planned
+## Phase 7 — Extended Intelligence 📋 Planned
 - Coverage tracking across test suites
 - Risk trend analysis — how risk evolves across re-analyses
 - Historical bug analysis for smarter risk scoring
