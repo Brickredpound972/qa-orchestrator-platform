@@ -8,14 +8,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
-/**
- * AnalysisRecordService
- *
- * Persists pipeline results to PostgreSQL.
- * Foundation for Phase 5 historical intelligence.
- */
 @Service
 public class AnalysisRecordService {
 
@@ -60,5 +56,34 @@ public class AnalysisRecordService {
 
     public List<AnalysisRecord> getHistoryForIssue(String issueKey) {
         return repository.findByIssueKeyOrderByAnalyzedAtDesc(issueKey);
+    }
+
+    public List<AnalysisRecord> getHighRiskTickets() {
+        return repository.findByRiskLevelOrderByRiskScoreDesc("HIGH");
+    }
+
+    public List<AnalysisRecord> getBlockedTickets() {
+        return repository.findByReleaseRecommendationOrderByAnalyzedAtDesc("Block");
+    }
+
+    public Map<String, Object> getSummary() {
+        Map<String, Object> summary = new HashMap<>();
+
+        long total = repository.count();
+        Double avgRisk = repository.findAverageRiskScore();
+        List<AnalysisRecord> highRisk = repository.findByRiskLevelOrderByRiskScoreDesc("HIGH");
+        List<AnalysisRecord> blocked = repository.findByReleaseRecommendationOrderByAnalyzedAtDesc("Block");
+        List<Object[]> mostAnalyzed = repository.findMostAnalyzedIssues();
+
+        summary.put("totalAnalyses", total);
+        summary.put("averageRiskScore", avgRisk != null ? Math.round(avgRisk) : 0);
+        summary.put("highRiskCount", highRisk.size());
+        summary.put("blockedCount", blocked.size());
+        summary.put("mostAnalyzedIssues", mostAnalyzed.stream()
+                .limit(5)
+                .map(row -> Map.of("issueKey", row[0], "count", row[1]))
+                .toList());
+
+        return summary;
     }
 }
