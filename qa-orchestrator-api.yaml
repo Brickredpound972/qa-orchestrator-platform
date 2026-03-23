@@ -1,196 +1,20 @@
 swagger: '2.0'
 info:
   title: QA Orchestrator API
-  description: Runs QA analysis for a Jira issue and returns a structured JSON response.
-  version: '2.0.0'
-
+  description: AI-powered QA decision engine. Analyzes Jira issues and returns structured QA intelligence including test cases, risk analysis, automation strategy, and release summaries.
+  version: 3.0.0
 host: qa-orchestrator-service.onrender.com
 basePath: /
 schemes:
   - https
 
 paths:
-  /qa/run/{issueKey}:
-    post:
-      operationId: runQaAnalysis
-      summary: Run QA analysis
-      description: Runs QA analysis for the provided Jira issue key.
-      produces:
-        - application/json
-      parameters:
-        - name: issueKey
-          in: path
-          description: Jira issue key, for example PROJ-4
-          required: true
-          type: string
-      responses:
-        '200':
-          description: QA analysis result
-          schema:
-            type: object
-            properties:
-              output:
-                type: string
-                description: Human-readable summary line
-              analysis:
-                type: object
-                properties:
-                  traceabilityId:
-                    type: string
-                    description: Jira issue key
-                  contractVersion:
-                    type: string
-                    description: API contract version
-                  analysisSummary:
-                    type: string
-                    description: One-line QA decision summary
-                  requirementStatus:
-                    type: string
-                    description: READY or BLOCKED
-                  featureSummary:
-                    type: string
-                    description: One-sentence feature description
-                  riskLevel:
-                    type: string
-                    description: LOW / MEDIUM / HIGH
-                  riskScore:
-                    type: integer
-                    description: Risk score 0-100
-                  releaseRecommendation:
-                    type: string
-                    description: Go / Caution / Block
-                  automationRecommendation:
-                    type: string
-                    description: Automation strategy
-                  stages:
-                    type: object
-                    properties:
-                      requirement:
-                        type: object
-                        properties:
-                          status:
-                            type: string
-                            description: READY or BLOCKED
-                          featureSummary:
-                            type: string
-                            description: Feature summary
-                          clarifiedRequirements:
-                            type: array
-                            items:
-                              type: string
-                            description: Testable requirements
-                          edgeCases:
-                            type: array
-                            items:
-                              type: string
-                            description: Edge case scenarios
-                          openQuestions:
-                            type: array
-                            items:
-                              type: string
-                            description: Open questions
-                          scope:
-                            type: array
-                            items:
-                              type: string
-                            description: In-scope areas
-                          outOfScope:
-                            type: array
-                            items:
-                              type: string
-                            description: Out-of-scope areas
-                      testDesign:
-                        type: object
-                        properties:
-                          testScenarios:
-                            type: array
-                            items:
-                              type: string
-                            description: Test scenario names
-                          testCases:
-                            type: array
-                            items:
-                              type: object
-                              properties:
-                                id:
-                                  type: string
-                                title:
-                                  type: string
-                                preconditions:
-                                  type: string
-                                steps:
-                                  type: array
-                                  items:
-                                    type: string
-                                expectedResult:
-                                  type: string
-                                testType:
-                                  type: string
-                                suiteTag:
-                                  type: string
-                                testData:
-                                  type: string
-                                priority:
-                                  type: string
-                      automation:
-                        type: object
-                        properties:
-                          automationRecommendation:
-                            type: string
-                          automationReasoning:
-                            type: string
-                          coverageSplit:
-                            type: string
-                          frameworkSuggestion:
-                            type: string
-                      risk:
-                        type: object
-                        properties:
-                          riskScore:
-                            type: integer
-                          riskLevel:
-                            type: string
-                          riskReason:
-                            type: string
-                          topRiskDrivers:
-                            type: array
-                            items:
-                              type: string
-                          releaseRecommendation:
-                            type: string
-                      bugReport:
-                        type: object
-                        properties:
-                          title:
-                            type: string
-                          environment:
-                            type: string
-                          severity:
-                            type: string
-                          priority:
-                            type: string
-                          reproductionSteps:
-                            type: array
-                            items:
-                              type: string
-                          expectedResult:
-                            type: string
-                          actualResult:
-                            type: string
-                          impactSummary:
-                            type: string
-                          affectedAreas:
-                            type: array
-                            items:
-                              type: string
-                          suggestedAssignee:
-                            type: string
 
   /qa/api/v1/qa/analyze:
     post:
       operationId: analyzeQaIssue
-      summary: Analyze QA issue (canonical endpoint)
-      description: Analyzes a Jira issue and returns structured QA insights.
+      summary: Analyze a Jira issue
+      description: Runs the full QA pipeline for a Jira issue. Returns requirement analysis, test cases, automation strategy, risk score, and bug report template.
       consumes:
         - application/json
       produces:
@@ -213,13 +37,170 @@ paths:
           schema:
             $ref: '#/definitions/QaAnalyzeResponse'
 
+  /qa/run/{issueKey}:
+    post:
+      operationId: runQaAnalysis
+      summary: Run QA analysis (legacy path)
+      description: Legacy endpoint. Use /qa/api/v1/qa/analyze instead.
+      produces:
+        - application/json
+      parameters:
+        - name: issueKey
+          in: path
+          required: true
+          type: string
+          description: Jira issue key, for example PROJ-4
+      responses:
+        '200':
+          description: QA analysis result
+          schema:
+            $ref: '#/definitions/QaAnalyzeResponse'
+
+  /qa/api/v1/intelligence/summary:
+    get:
+      operationId: getIntelligenceSummary
+      summary: Get QA intelligence summary
+      description: Returns aggregated intelligence across all analyses. Includes total analyses, average risk score, high risk count, blocked releases, released tickets, and risk distribution.
+      produces:
+        - application/json
+      responses:
+        '200':
+          description: Intelligence summary
+          schema:
+            type: object
+            properties:
+              totalAnalyses:
+                type: integer
+                description: Total number of analyses performed
+              averageRiskScore:
+                type: integer
+                description: Average risk score across all analyses
+              highRiskCount:
+                type: integer
+                description: Number of HIGH risk analyses
+              mediumRiskCount:
+                type: integer
+                description: Number of MEDIUM risk analyses
+              lowRiskCount:
+                type: integer
+                description: Number of LOW risk analyses
+              blockedCount:
+                type: integer
+                description: Number of analyses with Block recommendation
+              releasedCount:
+                type: integer
+                description: Number of tickets marked as Done with release summary
+              riskDistribution:
+                type: object
+                description: Risk level counts
+              releaseDistribution:
+                type: object
+                description: Release recommendation counts
+              mostAnalyzedIssues:
+                type: array
+                items:
+                  type: object
+                description: Most frequently analyzed Jira issues
+
+  /qa/api/v1/intelligence/blocked:
+    get:
+      operationId: getBlockedTickets
+      summary: Get blocked tickets
+      description: Returns all analyses where the release recommendation is Block, ordered by most recent first.
+      produces:
+        - application/json
+      responses:
+        '200':
+          description: List of blocked analysis records
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/AnalysisRecord'
+
+  /qa/api/v1/intelligence/released:
+    get:
+      operationId: getReleasedTickets
+      summary: Get released tickets with QA summaries
+      description: Returns all tickets that have been marked as Done, including the LLM-generated QA release summary and verdict.
+      produces:
+        - application/json
+      responses:
+        '200':
+          description: List of released analysis records with QA summaries
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/AnalysisRecord'
+
+  /qa/api/v1/history/{issueKey}:
+    get:
+      operationId: getIssueHistory
+      summary: Get analysis history for a Jira issue
+      description: Returns all analysis records for a specific Jira issue key, ordered by most recent first.
+      produces:
+        - application/json
+      parameters:
+        - name: issueKey
+          in: path
+          required: true
+          type: string
+          description: Jira issue key, for example PROJ-4
+      responses:
+        '200':
+          description: Analysis history for the issue
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/AnalysisRecord'
+
+  /qa/api/v1/history:
+    get:
+      operationId: getRecentHistory
+      summary: Get recent analyses
+      description: Returns the last 10 analysis records across all issues.
+      produces:
+        - application/json
+      responses:
+        '200':
+          description: Recent analysis records
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/AnalysisRecord'
+
+  /qa/health:
+    get:
+      operationId: getHealth
+      summary: Health check
+      description: Returns service status, version, uptime, and intelligence summary.
+      produces:
+        - application/json
+      responses:
+        '200':
+          description: Health status
+          schema:
+            type: object
+            properties:
+              status:
+                type: string
+                description: UP or DOWN
+              service:
+                type: string
+              version:
+                type: string
+              uptime:
+                type: string
+              intelligence:
+                type: object
+
 definitions:
+
   QaAnalyzeResponse:
     type: object
     properties:
       output:
         type: string
-        description: Human-readable summary line
+        description: Human-readable QA analysis output
       analysis:
         $ref: '#/definitions/QaAnalysis'
 
@@ -228,22 +209,31 @@ definitions:
     properties:
       traceabilityId:
         type: string
+        description: Jira issue key
       contractVersion:
         type: string
+        description: API contract version
       analysisSummary:
         type: string
+        description: One-line QA decision summary
       requirementStatus:
         type: string
+        description: READY or BLOCKED
       featureSummary:
         type: string
+        description: One-sentence feature description
       riskLevel:
         type: string
+        description: LOW / MEDIUM / HIGH
       riskScore:
         type: integer
+        description: Risk score 0-100
       releaseRecommendation:
         type: string
+        description: Go / Caution / Block
       automationRecommendation:
         type: string
+        description: Automation strategy
       stages:
         $ref: '#/definitions/QaStages'
 
@@ -380,3 +370,38 @@ definitions:
           type: string
       suggestedAssignee:
         type: string
+
+  AnalysisRecord:
+    type: object
+    properties:
+      id:
+        type: integer
+      issueKey:
+        type: string
+      featureSummary:
+        type: string
+      requirementStatus:
+        type: string
+      riskLevel:
+        type: string
+      riskScore:
+        type: integer
+      releaseRecommendation:
+        type: string
+      automationRecommendation:
+        type: string
+      testCaseCount:
+        type: integer
+      analyzedAt:
+        type: string
+        description: ISO 8601 timestamp
+      pipelineDurationMs:
+        type: integer
+      completedAt:
+        type: string
+        description: ISO 8601 timestamp — set when ticket moves to Done
+      releaseSummary:
+        type: string
+        description: LLM-generated QA release summary with verdict
+
+securityDefinitions: {}
