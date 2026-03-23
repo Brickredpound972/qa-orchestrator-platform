@@ -405,3 +405,108 @@ definitions:
         description: LLM-generated QA release summary with verdict
 
 securityDefinitions: {}
+
+  /qa/api/v1/intelligence/released/summary:
+    get:
+      operationId: getReleasedSummaryForCopilot
+      summary: Get released tickets summary (Copilot-friendly)
+      description: Returns released tickets in a formatted, human-readable structure. Use this in Copilot Studio instead of getReleasedTickets for better formatting.
+      produces:
+        - application/json
+      responses:
+        '200':
+          description: Formatted released tickets summary
+          schema:
+            type: object
+            properties:
+              count:
+                type: integer
+              message:
+                type: string
+                description: Human-readable formatted summary
+              tickets:
+                type: array
+                items:
+                  type: object
+
+  /qa/api/v1/intelligence/trends:
+    get:
+      operationId: getRiskTrends
+      summary: Get risk trends across all re-analyzed issues
+      description: Returns risk trend data for tickets analyzed more than once. Shows avg/min/max risk score and trend direction (INCREASING/DECREASING/STABLE).
+      produces:
+        - application/json
+      responses:
+        '200':
+          description: Risk trend data
+          schema:
+            type: array
+            items:
+              type: object
+              properties:
+                issueKey:
+                  type: string
+                avgRiskScore:
+                  type: integer
+                minRiskScore:
+                  type: integer
+                maxRiskScore:
+                  type: integer
+                analysisCount:
+                  type: integer
+                trend:
+                  type: string
+                  description: INCREASING / DECREASING / STABLE
+
+  /qa/api/v1/intelligence/trends/{issueKey}:
+    get:
+      operationId: getIssueTrend
+      summary: Get risk trend timeline for a specific issue
+      description: Returns the full risk score timeline for a Jira issue, showing how risk evolved across multiple analyses.
+      produces:
+        - application/json
+      parameters:
+        - name: issueKey
+          in: path
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Issue risk trend timeline
+          schema:
+            type: object
+            properties:
+              issueKey:
+                type: string
+              analysisCount:
+                type: integer
+              firstRiskScore:
+                type: integer
+              latestRiskScore:
+                type: integer
+              trend:
+                type: string
+              timeline:
+                type: array
+                items:
+                  type: object
+
+  /qa/api/v1/intelligence/reanalyzed:
+    get:
+      operationId: getReanalyzedIssues
+      summary: Get most re-analyzed issues
+      description: Returns Jira issues that have been analyzed more than once, ordered by analysis count.
+      produces:
+        - application/json
+      responses:
+        '200':
+          description: Re-analyzed issues
+          schema:
+            type: array
+            items:
+              type: object
+              properties:
+                issueKey:
+                  type: string
+                analysisCount:
+                  type: integer

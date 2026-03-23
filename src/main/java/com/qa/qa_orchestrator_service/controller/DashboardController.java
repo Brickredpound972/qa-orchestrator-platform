@@ -35,10 +35,18 @@ public class DashboardController {
   .metric-value.amber { color: #d97706; }
   .metric-value.green { color: #16a34a; }
   .section { background: #fff; border-radius: 10px; border: 1px solid #e8e8e8; margin-bottom: 1.5rem; overflow: hidden; }
-  .section-header { padding: 1rem 1.5rem; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; justify-content: space-between; }
+  .section-header { padding: 1rem 1.5rem; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
   .section-title { font-size: 14px; font-weight: 500; }
+  .controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .search-input { border: 1px solid #e0e0e0; border-radius: 6px; padding: 5px 10px; font-size: 12px; width: 160px; outline: none; }
+  .search-input:focus { border-color: #1a6ef5; }
+  .filter-select { border: 1px solid #e0e0e0; border-radius: 6px; padding: 5px 8px; font-size: 12px; outline: none; background: #fff; cursor: pointer; }
+  .filter-select:focus { border-color: #1a6ef5; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th { text-align: left; padding: 10px 1.5rem; font-size: 11px; color: #888; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; background: #fafafa; border-bottom: 1px solid #f0f0f0; }
+  th { text-align: left; padding: 10px 1.5rem; font-size: 11px; color: #888; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; background: #fafafa; border-bottom: 1px solid #f0f0f0; cursor: pointer; user-select: none; }
+  th:hover { color: #1a1a1a; }
+  th .sort-icon { margin-left: 4px; opacity: 0.4; }
+  th.sorted .sort-icon { opacity: 1; color: #1a6ef5; }
   td { padding: 12px 1.5rem; border-bottom: 1px solid #f8f8f8; vertical-align: top; }
   tr:last-child td { border-bottom: none; }
   tr:hover td { background: #fafafa; }
@@ -48,16 +56,17 @@ public class DashboardController {
   .badge-Block { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:500; background:#fee2e2; color:#991b1b; }
   .badge-Caution { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:500; background:#fef3c7; color:#92400e; }
   .badge-Go { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:500; background:#dcfce7; color:#166534; }
-  .verdict { font-size: 12px; font-weight: 500; margin-bottom: 4px; }
-  .verdict.approved { color: #16a34a; }
-  .verdict.risk { color: #d97706; }
-  .verdict.missing { color: #dc2626; }
-  .summary-text { font-size: 12px; color: #555; line-height: 1.5; max-width: 500px; white-space: pre-wrap; }
+  .verdict.approved { color: #16a34a; font-size:12px; font-weight:500; }
+  .verdict.risk { color: #d97706; font-size:12px; font-weight:500; }
+  .verdict.missing { color: #dc2626; font-size:12px; font-weight:500; }
   .chart-wrap { padding: 1.5rem; }
   .loading { text-align: center; padding: 3rem; color: #888; font-size: 14px; }
-  .refresh-btn { background: none; border: 1px solid #ddd; border-radius: 6px; padding: 4px 12px; font-size: 12px; cursor: pointer; color: #555; }
-  .refresh-btn:hover { background: #f5f5f5; }
+  .no-results { text-align: center; padding: 2rem; color: #aaa; font-size: 13px; }
+  .btn { background: none; border: 1px solid #ddd; border-radius: 6px; padding: 5px 12px; font-size: 12px; cursor: pointer; color: #555; }
+  .btn:hover { background: #f5f5f5; }
+  .btn.active { background: #1a6ef5; color: #fff; border-color: #1a6ef5; }
   .ts { font-size: 11px; color: #aaa; }
+  .count-badge { font-size: 11px; color: #888; margin-left: 6px; }
 </style>
 </head>
 <body>
@@ -66,9 +75,11 @@ public class DashboardController {
   <span class="badge">v2</span>
 </div>
 <div class="container">
+
   <div class="metrics" id="metrics">
     <div class="loading" style="grid-column:span 4">Loading...</div>
   </div>
+
   <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; margin-bottom:1.5rem;">
     <div class="section">
       <div class="section-header"><span class="section-title">Risk distribution</span></div>
@@ -79,25 +90,55 @@ public class DashboardController {
       <div class="chart-wrap"><div style="position:relative; height:200px;"><canvas id="releaseChart"></canvas></div></div>
     </div>
   </div>
+
   <div class="section">
     <div class="section-header">
-      <span class="section-title">Recent analyses</span>
-      <button class="refresh-btn" onclick="loadAll()">Refresh</button>
+      <span class="section-title">Recent analyses <span class="count-badge" id="history-count"></span></span>
+      <div class="controls">
+        <input class="search-input" id="history-search" placeholder="Search issue or feature..." oninput="filterHistory()">
+        <select class="filter-select" id="history-risk" onchange="filterHistory()">
+          <option value="">All risks</option>
+          <option value="HIGH">High</option>
+          <option value="MEDIUM">Medium</option>
+          <option value="LOW">Low</option>
+        </select>
+        <select class="filter-select" id="history-release" onchange="filterHistory()">
+          <option value="">All releases</option>
+          <option value="Block">Block</option>
+          <option value="Caution">Caution</option>
+          <option value="Go">Go</option>
+        </select>
+        <button class="btn" onclick="loadAll()">Refresh</button>
+      </div>
     </div>
     <div id="history-table"><div class="loading">Loading...</div></div>
   </div>
+
   <div class="section">
-    <div class="section-header"><span class="section-title">Blocked tickets</span></div>
+    <div class="section-header">
+      <span class="section-title">Blocked tickets <span class="count-badge" id="blocked-count"></span></span>
+      <div class="controls">
+        <input class="search-input" id="blocked-search" placeholder="Search..." oninput="filterBlocked()">
+      </div>
+    </div>
     <div id="blocked-table"><div class="loading">Loading...</div></div>
   </div>
+
   <div class="section">
-    <div class="section-header"><span class="section-title">Released tickets — QA summaries</span></div>
+    <div class="section-header">
+      <span class="section-title">Released tickets — QA summaries <span class="count-badge" id="released-count"></span></span>
+      <div class="controls">
+        <input class="search-input" id="released-search" placeholder="Search..." oninput="filterReleased()">
+      </div>
+    </div>
     <div id="released-table"><div class="loading">Loading...</div></div>
   </div>
+
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script>
 let riskChartInst, releaseChartInst;
+let allHistory = [], allBlocked = [], allReleased = [];
 
 function fmt(ts) {
   if (!ts) return '-';
@@ -106,71 +147,44 @@ function fmt(ts) {
          d.toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'});
 }
 
-function verdictClass(summary) {
-  if (!summary) return '';
-  const s = summary.toUpperCase();
-  if (s.startsWith('APPROVED WITH RISK')) return 'risk';
-  if (s.startsWith('APPROVED')) return 'approved';
-  if (s.startsWith('RELEASED WITHOUT')) return 'missing';
-  return '';
+function verdictClass(s) {
+  if (!s) return '';
+  const u = s.toUpperCase();
+  if (u.startsWith('APPROVED WITH RISK')) return 'risk';
+  if (u.startsWith('APPROVED')) return 'approved';
+  return 'missing';
 }
 
-function verdictLine(summary) {
-  if (!summary) return '-';
-  return summary.split('\\n')[0];
+function verdictLine(s) {
+  return s ? s.split('\\n')[0] : '-';
 }
 
 async function loadSummary() {
-  const res = await fetch('/qa/api/v1/intelligence/summary');
-  const d = await res.json();
-
+  const d = await fetch('/qa/api/v1/intelligence/summary').then(r=>r.json());
   document.getElementById('metrics').innerHTML = `
-    <div class="metric-card">
-      <div class="metric-label">Total analyses</div>
-      <div class="metric-value blue">${d.totalAnalyses}</div>
-    </div>
-    <div class="metric-card">
-      <div class="metric-label">Avg risk score</div>
-      <div class="metric-value amber">${Math.round(d.averageRiskScore)}</div>
-    </div>
-    <div class="metric-card">
-      <div class="metric-label">Blocked releases</div>
-      <div class="metric-value red">${d.blockedCount}</div>
-    </div>
-    <div class="metric-card">
-      <div class="metric-label">Released tickets</div>
-      <div class="metric-value green">${d.releasedCount || 0}</div>
-    </div>
+    <div class="metric-card"><div class="metric-label">Total analyses</div><div class="metric-value blue">${d.totalAnalyses}</div></div>
+    <div class="metric-card"><div class="metric-label">Avg risk score</div><div class="metric-value amber">${Math.round(d.averageRiskScore)}</div></div>
+    <div class="metric-card"><div class="metric-label">Blocked releases</div><div class="metric-value red">${d.blockedCount}</div></div>
+    <div class="metric-card"><div class="metric-label">Released tickets</div><div class="metric-value green">${d.releasedCount||0}</div></div>
   `;
-
-  const rd = d.riskDistribution || {};
+  const rd = d.riskDistribution||{};
   if (riskChartInst) riskChartInst.destroy();
   riskChartInst = new Chart(document.getElementById('riskChart'), {
-    type: 'doughnut',
-    data: {
-      labels: ['High','Medium','Low'],
-      datasets: [{ data: [rd.HIGH||0, rd.MEDIUM||0, rd.LOW||0], backgroundColor: ['#dc2626','#d97706','#16a34a'], borderWidth: 0 }]
-    },
-    options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom', labels:{ font:{size:12}, boxWidth:12 } } } }
+    type:'doughnut', data:{ labels:['High','Medium','Low'], datasets:[{ data:[rd.HIGH||0,rd.MEDIUM||0,rd.LOW||0], backgroundColor:['#dc2626','#d97706','#16a34a'], borderWidth:0 }] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom', labels:{ font:{size:12}, boxWidth:12 } } } }
   });
-
-  const rl = d.releaseDistribution || {};
+  const rl = d.releaseDistribution||{};
   if (releaseChartInst) releaseChartInst.destroy();
   releaseChartInst = new Chart(document.getElementById('releaseChart'), {
-    type: 'doughnut',
-    data: {
-      labels: ['Block','Caution','Go'],
-      datasets: [{ data: [rl.Block||0, rl.Caution||0, rl.Go||0], backgroundColor: ['#dc2626','#d97706','#16a34a'], borderWidth: 0 }]
-    },
-    options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom', labels:{ font:{size:12}, boxWidth:12 } } } }
+    type:'doughnut', data:{ labels:['Block','Caution','Go'], datasets:[{ data:[rl.Block||0,rl.Caution||0,rl.Go||0], backgroundColor:['#dc2626','#d97706','#16a34a'], borderWidth:0 }] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom', labels:{ font:{size:12}, boxWidth:12 } } } }
   });
 }
 
-async function loadHistory() {
-  const res = await fetch('/qa/api/v1/history');
-  const data = await res.json();
-  if (!data.length) { document.getElementById('history-table').innerHTML='<div class="loading">No data yet</div>'; return; }
-  const rows = data.map(r => `
+function renderHistory(data) {
+  document.getElementById('history-count').textContent = data.length + ' records';
+  if (!data.length) { document.getElementById('history-table').innerHTML='<div class="no-results">No results found</div>'; return; }
+  const rows = data.map(r=>`
     <tr>
       <td><strong>${r.issueKey}</strong></td>
       <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.featureSummary||'-'}</td>
@@ -180,18 +194,25 @@ async function loadHistory() {
       <td>${r.testCaseCount??0} cases</td>
       <td class="ts">${fmt(r.analyzedAt)}</td>
     </tr>`).join('');
-  document.getElementById('history-table').innerHTML = `
-    <table>
-      <thead><tr><th>Issue</th><th>Feature</th><th>Risk</th><th>Score</th><th>Release</th><th>Tests</th><th>Analyzed</th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table>`;
+  document.getElementById('history-table').innerHTML=`
+    <table><thead><tr><th>Issue</th><th>Feature</th><th>Risk</th><th>Score</th><th>Release</th><th>Tests</th><th>Analyzed</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
-async function loadBlocked() {
-  const res = await fetch('/qa/api/v1/intelligence/blocked');
-  const data = await res.json();
-  if (!data.length) { document.getElementById('blocked-table').innerHTML='<div class="loading">No blocked tickets</div>'; return; }
-  const rows = data.map(r => `
+function filterHistory() {
+  const search = document.getElementById('history-search').value.toLowerCase();
+  const risk = document.getElementById('history-risk').value;
+  const release = document.getElementById('history-release').value;
+  let filtered = allHistory;
+  if (search) filtered = filtered.filter(r => (r.issueKey||'').toLowerCase().includes(search) || (r.featureSummary||'').toLowerCase().includes(search));
+  if (risk) filtered = filtered.filter(r => r.riskLevel === risk);
+  if (release) filtered = filtered.filter(r => r.releaseRecommendation === release);
+  renderHistory(filtered);
+}
+
+function renderBlocked(data) {
+  document.getElementById('blocked-count').textContent = data.length + ' tickets';
+  if (!data.length) { document.getElementById('blocked-table').innerHTML='<div class="no-results">No blocked tickets</div>'; return; }
+  const rows = data.map(r=>`
     <tr>
       <td><strong>${r.issueKey}</strong></td>
       <td>${r.featureSummary||'-'}</td>
@@ -199,37 +220,49 @@ async function loadBlocked() {
       <td>${r.automationRecommendation||'-'}</td>
       <td class="ts">${fmt(r.analyzedAt)}</td>
     </tr>`).join('');
-  document.getElementById('blocked-table').innerHTML = `
-    <table>
-      <thead><tr><th>Issue</th><th>Feature</th><th>Score</th><th>Automation</th><th>Analyzed</th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table>`;
+  document.getElementById('blocked-table').innerHTML=`
+    <table><thead><tr><th>Issue</th><th>Feature</th><th>Score</th><th>Automation</th><th>Analyzed</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
-async function loadReleased() {
-  const res = await fetch('/qa/api/v1/intelligence/released');
-  const data = await res.json();
-  if (!data.length) { document.getElementById('released-table').innerHTML='<div class="loading">No released tickets yet</div>'; return; }
-  const rows = data.map(r => `
+function filterBlocked() {
+  const search = document.getElementById('blocked-search').value.toLowerCase();
+  let filtered = allBlocked;
+  if (search) filtered = filtered.filter(r => (r.issueKey||'').toLowerCase().includes(search) || (r.featureSummary||'').toLowerCase().includes(search));
+  renderBlocked(filtered);
+}
+
+function renderReleased(data) {
+  document.getElementById('released-count').textContent = data.length + ' tickets';
+  if (!data.length) { document.getElementById('released-table').innerHTML='<div class="no-results">No released tickets yet</div>'; return; }
+  const rows = data.map(r=>`
     <tr>
       <td><strong>${r.issueKey}</strong></td>
       <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.featureSummary||'-'}</td>
       <td><span class="badge-${r.riskLevel}">${r.riskLevel||'-'}</span></td>
-      <td>
-        <div class="verdict ${verdictClass(r.releaseSummary)}">${verdictLine(r.releaseSummary)}</div>
-      </td>
+      <td><div class="verdict ${verdictClass(r.releaseSummary)}">${verdictLine(r.releaseSummary)}</div></td>
       <td class="ts">${fmt(r.completedAt)}</td>
     </tr>`).join('');
-  document.getElementById('released-table').innerHTML = `
-    <table>
-      <thead><tr><th>Issue</th><th>Feature</th><th>Risk</th><th>QA Verdict</th><th>Released</th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table>`;
+  document.getElementById('released-table').innerHTML=`
+    <table><thead><tr><th>Issue</th><th>Feature</th><th>Risk</th><th>QA Verdict</th><th>Released</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function filterReleased() {
+  const search = document.getElementById('released-search').value.toLowerCase();
+  let filtered = allReleased;
+  if (search) filtered = filtered.filter(r => (r.issueKey||'').toLowerCase().includes(search) || (r.featureSummary||'').toLowerCase().includes(search));
+  renderReleased(filtered);
 }
 
 async function loadAll() {
-  try { await Promise.all([loadSummary(), loadHistory(), loadBlocked(), loadReleased()]); }
-  catch(e) { console.error(e); }
+  try {
+    await loadSummary();
+    allHistory = await fetch('/qa/api/v1/history').then(r=>r.json());
+    renderHistory(allHistory);
+    allBlocked = await fetch('/qa/api/v1/intelligence/blocked').then(r=>r.json());
+    renderBlocked(allBlocked);
+    allReleased = await fetch('/qa/api/v1/intelligence/released').then(r=>r.json());
+    renderReleased(allReleased);
+  } catch(e) { console.error(e); }
 }
 
 loadAll();

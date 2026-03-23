@@ -11,15 +11,10 @@ import java.util.Optional;
 public interface AnalysisRecordRepository extends JpaRepository<AnalysisRecord, Long> {
 
     List<AnalysisRecord> findByIssueKeyOrderByAnalyzedAtDesc(String issueKey);
-
     List<AnalysisRecord> findTop10ByOrderByAnalyzedAtDesc();
-
     List<AnalysisRecord> findByRiskLevelOrderByRiskScoreDesc(String riskLevel);
-
     List<AnalysisRecord> findByReleaseRecommendationOrderByAnalyzedAtDesc(String releaseRecommendation);
-
     List<AnalysisRecord> findByCompletedAtIsNotNullOrderByCompletedAtDesc();
-
     Optional<AnalysisRecord> findTopByIssueKeyOrderByAnalyzedAtDesc(String issueKey);
 
     @Query("SELECT AVG(a.riskScore) FROM AnalysisRecord a")
@@ -33,6 +28,16 @@ public interface AnalysisRecordRepository extends JpaRepository<AnalysisRecord, 
 
     @Query("SELECT a.releaseRecommendation, COUNT(a) FROM AnalysisRecord a GROUP BY a.releaseRecommendation")
     List<Object[]> countByReleaseRecommendation();
+
+    // Phase 10 — Risk trend queries
+    @Query("SELECT a.issueKey, AVG(a.riskScore), MIN(a.riskScore), MAX(a.riskScore), COUNT(a) FROM AnalysisRecord a GROUP BY a.issueKey HAVING COUNT(a) > 1 ORDER BY AVG(a.riskScore) DESC")
+    List<Object[]> findRiskTrendPerIssue();
+
+    @Query("SELECT a FROM AnalysisRecord a WHERE a.issueKey = :issueKey ORDER BY a.analyzedAt ASC")
+    List<AnalysisRecord> findByIssueKeyOrderByAnalyzedAtAsc(String issueKey);
+
+    @Query("SELECT a.issueKey, COUNT(a) FROM AnalysisRecord a GROUP BY a.issueKey HAVING COUNT(a) > 1 ORDER BY COUNT(a) DESC")
+    List<Object[]> findReanalyzedIssues();
 
     long count();
 }
