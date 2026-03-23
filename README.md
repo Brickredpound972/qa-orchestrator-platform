@@ -1,3 +1,7 @@
+© 2026 Jack Yilmaz. All rights reserved.
+This source code may not be copied, modified, distributed, or used
+for commercial purposes without explicit written permission from the author.
+
 # QA Orchestrator Platform
 
 ![Java](https://img.shields.io/badge/Java-17-blue)
