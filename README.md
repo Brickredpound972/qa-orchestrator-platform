@@ -1,19 +1,14 @@
-© 2026 Jack Yilmaz. All rights reserved.
-This source code may not be copied, modified, distributed, or used
-for commercial purposes without explicit written permission from the author.
-
 # QA Orchestrator Platform
 
 ![Java](https://img.shields.io/badge/Java-17-blue)
 ![Spring Boot](https://img.shields.io/badge/SpringBoot-3-green)
 ![API](https://img.shields.io/badge/API-Live-brightgreen)
-![Contract](https://img.shields.io/badge/Contract-v2-orange)
+![Contract](https://img.shields.io/badge/Contract-v3-orange)
 ![LLM](https://img.shields.io/badge/LLM-Groq%20%2F%20Llama%203.3-purple)
 ![DB](https://img.shields.io/badge/DB-PostgreSQL-blue)
+![Copilot](https://img.shields.io/badge/Copilot-Studio-0078d4)
 
-**QA Orchestrator Platform** is an AI-powered QA decision engine that covers the full QA lifecycle — from ticket creation to release.
-
-When a developer moves a ticket to **"In Progress"**, the system automatically runs a full QA analysis pipeline. When the ticket moves to **"Done"**, the system generates a final QA release summary. Everything is tracked in PostgreSQL and visualized on a live dashboard.
+**QA Orchestrator Platform** is an AI-powered QA decision engine that covers the full QA lifecycle — from ticket creation to release — integrated with Microsoft Copilot Studio and Power Automate.
 
 ---
 
@@ -21,8 +16,8 @@ When a developer moves a ticket to **"In Progress"**, the system automatically r
 
 | | URL |
 |---|---|
-| API | https://qa-orchestrator-service.onrender.com |
-| Dashboard | https://qa-orchestrator-service.onrender.com/qa/dashboard |
+| Dashboard | https://qa-orchestrator-service.onrender.com |
+| API | https://qa-orchestrator-service.onrender.com/qa/api/v1/qa/analyze |
 | Health | https://qa-orchestrator-service.onrender.com/qa/health |
 
 ---
@@ -32,7 +27,7 @@ When a developer moves a ticket to **"In Progress"**, the system automatically r
 ```
 Developer opens Jira ticket
         ↓
-Developer moves ticket to "In Progress"
+Moves ticket to "In Progress"
         ↓
 Jira webhook fires → QA pipeline runs automatically
         ↓
@@ -42,19 +37,15 @@ Stage 3 — Automation Decision
 Stage 4 — Risk Analysis
 Stage 5 — Bug Report Template
         ↓
-Results saved to PostgreSQL + added as Jira comment
+Results → PostgreSQL + Jira comment + Dashboard
         ↓
-Dashboard updated — risk level, test cases, release decision
-        ↓
-Developer moves ticket to "Done"
+Moves ticket to "Done"
         ↓
 Jira webhook fires → QA Release Summary generated
         ↓
 Verdict: APPROVED / APPROVED WITH RISK / RELEASED WITHOUT FULL COVERAGE
         ↓
-Summary saved to PostgreSQL + added as Jira comment
-        ↓
-Dashboard — Released tickets section updated
+Summary → PostgreSQL + Jira comment + Dashboard
 ```
 
 ---
@@ -92,8 +83,6 @@ Switch providers by changing a single env var — no code change needed.
 
 ## QA Analysis Pipeline
 
-All stages are LLM-powered and feed into each other.
-
 | Stage | Input | Output |
 |-------|-------|--------|
 | Requirement Analysis | Raw Jira JSON | clarifiedRequirements, edgeCases, openQuestions, scope |
@@ -105,16 +94,30 @@ All stages are LLM-powered and feed into each other.
 
 ---
 
+## Copilot Studio Topics
+
+| Topic | Trigger | Action |
+|-------|---------|--------|
+| `agent_requirement_analyzer` | "Analyze PROJ-4" | `analyzeQaIssue` |
+| `agent_test_case_generator` | "Generate test cases" | `analyzeQaIssue` |
+| `agent_risk_predictor` | "What is the risk?" | `analyzeQaIssue` |
+| `agent_automation_builder` | "Automation strategy" | `analyzeQaIssue` |
+| `agent_bug_reporter` | "Create bug report" | `analyzeQaIssue` |
+| `agent_intelligence_summary` | "QA summary / risk status" | `getIntelligenceSummary` |
+| `agent_release_summary` | "Released tickets / verdict" | `getReleasedTickets` |
+
+---
+
 ## Intelligence Dashboard
 
-Available at `/qa/dashboard`:
+Available at root URL — `https://qa-orchestrator-service.onrender.com`:
 
 - Total analyses, avg risk score, blocked releases, released tickets
-- Risk distribution chart (High / Medium / Low) — real DB counts
-- Release decision chart (Block / Caution / Go) — real DB counts
-- Recent analyses table with risk badges
+- Risk distribution chart (High / Medium / Low)
+- Release decision chart (Block / Caution / Go)
+- Recent analyses table
 - Blocked tickets list
-- **Released tickets — QA verdicts with release summary**
+- Released tickets with QA verdicts
 
 ---
 
@@ -122,8 +125,8 @@ Available at `/qa/dashboard`:
 
 | Status | Action |
 |--------|--------|
-| `In Progress` | Triggers full QA analysis pipeline |
-| `Done` | Triggers QA release summary generation |
+| `In Progress` | Full QA analysis pipeline |
+| `Done` | QA release summary generation |
 
 **Setup:**
 1. Jira → System → WebHooks → Create a WebHook
@@ -137,6 +140,7 @@ Available at `/qa/dashboard`:
 
 | Method | Path | Description |
 |--------|------|-------------|
+| GET | `/` | Redirects to dashboard |
 | GET | `/qa/health` | Health check with intelligence summary |
 | GET | `/qa/dashboard` | QA Intelligence Dashboard |
 | POST | `/qa/api/v1/qa/analyze` | Manual analysis trigger |
@@ -144,9 +148,9 @@ Available at `/qa/dashboard`:
 | GET | `/qa/api/v1/history` | Last 10 analyses |
 | GET | `/qa/api/v1/history/{issueKey}` | History for specific ticket |
 | GET | `/qa/api/v1/intelligence/summary` | Aggregated intelligence summary |
-| GET | `/qa/api/v1/intelligence/high-risk` | All HIGH risk analyses |
-| GET | `/qa/api/v1/intelligence/blocked` | All blocked analyses |
-| GET | `/qa/api/v1/intelligence/released` | All released tickets with QA summaries |
+| GET | `/qa/api/v1/intelligence/high-risk` | HIGH risk analyses |
+| GET | `/qa/api/v1/intelligence/blocked` | Blocked analyses |
+| GET | `/qa/api/v1/intelligence/released` | Released tickets with QA summaries |
 
 ---
 
@@ -188,10 +192,11 @@ Available at `/qa/dashboard`:
 
 | Phase | Status | Description |
 |-------|--------|-------------|
-| Phase 1 | ✅ Complete | Spring Boot backend, Jira integration, pipeline, Render deployment |
-| Phase 2 | ✅ Complete | LLM-powered stages, Groq integration, versioned API contract |
-| Phase 3 | ✅ Complete | Structured logging, health endpoint, error handling, retry logic |
-| Phase 4 | ✅ Complete | Input validation, timeout protection, Jira error handling, logging cleanup |
-| Phase 5 | ✅ Complete | PostgreSQL persistence, history API, intelligence endpoints, dashboard |
-| Phase 6 | ✅ Complete | Full QA lifecycle — webhook automation, release summary, LLM provider abstraction |
-| Phase 7 | 📋 Planned | Coverage tracking, risk trends, historical bug analysis, multi-tenant support |
+| Phase 1 | ✅ | Spring Boot backend, Jira integration, pipeline, Render deployment |
+| Phase 2 | ✅ | LLM-powered stages, Groq integration, versioned API contract |
+| Phase 3 | ✅ | Structured logging, health endpoint, error handling, retry logic |
+| Phase 4 | ✅ | Input validation, timeout protection, Jira error handling, logging cleanup |
+| Phase 5 | ✅ | PostgreSQL, history API, intelligence endpoints, dashboard |
+| Phase 6 | ✅ | Full QA lifecycle — webhook automation, release summary, LLM provider abstraction |
+| Phase 7 | ✅ | Copilot Studio v2 — intelligence summary + release summary topics |
+| Phase 8 | 📋 | Dashboard filtering, risk trends, coverage tracking, multi-tenant |

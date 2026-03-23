@@ -42,20 +42,27 @@
 - Health endpoint enriched with intelligence summary
 - QA Intelligence Dashboard at `/qa/dashboard`
 - Real risk distribution and release decision charts
+- Root URL redirects to dashboard
 
 ## Phase 6 — Full QA Lifecycle Automation ✅ Complete
 - Jira webhook — auto-trigger analysis on "In Progress"
 - Jira webhook — auto-trigger release summary on "Done"
 - LlmClient interface — provider agnostic pipeline
 - GroqClient, AzureOpenAiClient, AwsBedrockClient implementations
-- Switch provider via `LLM_PROVIDER` env var
+- Switch provider via `LLM_PROVIDER` env var (groq / azure / aws)
 - Released tickets section in dashboard with QA verdict
 - completedAt + releaseSummary persisted to PostgreSQL
 - End-to-end QA lifecycle: ticket open → analysis → release summary
 
-## Phase 7 — Extended Intelligence 📋 Planned
-- Coverage tracking across test suites
+## Phase 7 — Copilot Studio Integration v2 ✅ Complete
+- Swagger v3.0.0 — all endpoints documented
+- agent_intelligence_summary topic — overall QA status in Teams
+- agent_release_summary topic — released tickets and QA verdicts in Teams
+- Power Automate custom connector updated to v3
+
+## Phase 8 — Extended Intelligence 📋 Planned
+- Dashboard filtering and search
 - Risk trend analysis — how risk evolves across re-analyses
+- Coverage tracking across test suites
 - Historical bug analysis for smarter risk scoring
-- Dashboard improvements — drill-down, filtering, search
 - Multi-tenant support — per-customer isolation
