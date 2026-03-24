@@ -9,12 +9,11 @@ schemes:
   - https
 
 paths:
-
   /qa/api/v1/qa/analyze:
     post:
       operationId: analyzeQaIssue
       summary: Analyze a Jira issue
-      description: Runs the full QA pipeline for a Jira issue. Returns requirement analysis, test cases, automation strategy, risk score, and bug report template.
+      description: Runs the full QA pipeline for a Jira issue.
       consumes:
         - application/json
       produces:
@@ -40,7 +39,7 @@ paths:
   /qa/run/{issueKey}:
     post:
       operationId: runQaAnalysis
-      summary: Run QA analysis (legacy path)
+      summary: Run QA analysis (legacy)
       description: Legacy endpoint. Use /qa/api/v1/qa/analyze instead.
       produces:
         - application/json
@@ -49,7 +48,6 @@ paths:
           in: path
           required: true
           type: string
-          description: Jira issue key, for example PROJ-4
       responses:
         '200':
           description: QA analysis result
@@ -60,7 +58,7 @@ paths:
     get:
       operationId: getIntelligenceSummary
       summary: Get QA intelligence summary
-      description: Returns aggregated intelligence across all analyses. Includes total analyses, average risk score, high risk count, blocked releases, released tickets, and risk distribution.
+      description: Returns aggregated intelligence across all analyses.
       produces:
         - application/json
       responses:
@@ -71,47 +69,37 @@ paths:
             properties:
               totalAnalyses:
                 type: integer
-                description: Total number of analyses performed
               averageRiskScore:
                 type: integer
-                description: Average risk score across all analyses
               highRiskCount:
                 type: integer
-                description: Number of HIGH risk analyses
               mediumRiskCount:
                 type: integer
-                description: Number of MEDIUM risk analyses
               lowRiskCount:
                 type: integer
-                description: Number of LOW risk analyses
               blockedCount:
                 type: integer
-                description: Number of analyses with Block recommendation
               releasedCount:
                 type: integer
-                description: Number of tickets marked as Done with release summary
               riskDistribution:
                 type: object
-                description: Risk level counts
               releaseDistribution:
                 type: object
-                description: Release recommendation counts
               mostAnalyzedIssues:
                 type: array
                 items:
                   type: object
-                description: Most frequently analyzed Jira issues
 
   /qa/api/v1/intelligence/blocked:
     get:
       operationId: getBlockedTickets
       summary: Get blocked tickets
-      description: Returns all analyses where the release recommendation is Block, ordered by most recent first.
+      description: Returns all analyses where release recommendation is Block.
       produces:
         - application/json
       responses:
         '200':
-          description: List of blocked analysis records
+          description: Blocked analysis records
           schema:
             type: array
             items:
@@ -121,22 +109,72 @@ paths:
     get:
       operationId: getReleasedTickets
       summary: Get released tickets with QA summaries
-      description: Returns all tickets that have been marked as Done, including the LLM-generated QA release summary and verdict.
+      description: Returns all tickets marked as Done with LLM-generated QA release summary.
       produces:
         - application/json
       responses:
         '200':
-          description: List of released analysis records with QA summaries
+          description: Released analysis records
           schema:
             type: array
             items:
               $ref: '#/definitions/AnalysisRecord'
 
-  /qa/api/v1/history/{issueKey}:
+  /qa/api/v1/intelligence/released/summary:
     get:
-      operationId: getIssueHistory
-      summary: Get analysis history for a Jira issue
-      description: Returns all analysis records for a specific Jira issue key, ordered by most recent first.
+      operationId: getReleasedSummaryForCopilot
+      summary: Get released tickets summary (Copilot-friendly)
+      description: Returns released tickets in human-readable format. Use this in Copilot Studio for better formatting.
+      produces:
+        - application/json
+      responses:
+        '200':
+          description: Formatted released tickets summary
+          schema:
+            type: object
+            properties:
+              count:
+                type: integer
+              message:
+                type: string
+              tickets:
+                type: array
+                items:
+                  type: object
+
+  /qa/api/v1/intelligence/trends:
+    get:
+      operationId: getRiskTrends
+      summary: Get risk trends across re-analyzed issues
+      description: Returns risk trend data for tickets analyzed more than once.
+      produces:
+        - application/json
+      responses:
+        '200':
+          description: Risk trend data
+          schema:
+            type: array
+            items:
+              type: object
+              properties:
+                issueKey:
+                  type: string
+                avgRiskScore:
+                  type: integer
+                minRiskScore:
+                  type: integer
+                maxRiskScore:
+                  type: integer
+                analysisCount:
+                  type: integer
+                trend:
+                  type: string
+
+  /qa/api/v1/intelligence/trends/{issueKey}:
+    get:
+      operationId: getIssueTrend
+      summary: Get risk trend timeline for a specific issue
+      description: Returns the full risk score timeline for a Jira issue.
       produces:
         - application/json
       parameters:
@@ -144,10 +182,62 @@ paths:
           in: path
           required: true
           type: string
-          description: Jira issue key, for example PROJ-4
       responses:
         '200':
-          description: Analysis history for the issue
+          description: Issue risk trend timeline
+          schema:
+            type: object
+            properties:
+              issueKey:
+                type: string
+              analysisCount:
+                type: integer
+              firstRiskScore:
+                type: integer
+              latestRiskScore:
+                type: integer
+              trend:
+                type: string
+              timeline:
+                type: array
+                items:
+                  type: object
+
+  /qa/api/v1/intelligence/reanalyzed:
+    get:
+      operationId: getReanalyzedIssues
+      summary: Get most re-analyzed issues
+      description: Returns Jira issues analyzed more than once, ordered by analysis count.
+      produces:
+        - application/json
+      responses:
+        '200':
+          description: Re-analyzed issues
+          schema:
+            type: array
+            items:
+              type: object
+              properties:
+                issueKey:
+                  type: string
+                analysisCount:
+                  type: integer
+
+  /qa/api/v1/history/{issueKey}:
+    get:
+      operationId: getIssueHistory
+      summary: Get analysis history for a Jira issue
+      description: Returns all analysis records for a specific issue key.
+      produces:
+        - application/json
+      parameters:
+        - name: issueKey
+          in: path
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Analysis history
           schema:
             type: array
             items:
@@ -157,7 +247,7 @@ paths:
     get:
       operationId: getRecentHistory
       summary: Get recent analyses
-      description: Returns the last 10 analysis records across all issues.
+      description: Returns the last 10 analysis records.
       produces:
         - application/json
       responses:
@@ -183,7 +273,6 @@ paths:
             properties:
               status:
                 type: string
-                description: UP or DOWN
               service:
                 type: string
               version:
@@ -194,13 +283,11 @@ paths:
                 type: object
 
 definitions:
-
   QaAnalyzeResponse:
     type: object
     properties:
       output:
         type: string
-        description: Human-readable QA analysis output
       analysis:
         $ref: '#/definitions/QaAnalysis'
 
@@ -209,31 +296,22 @@ definitions:
     properties:
       traceabilityId:
         type: string
-        description: Jira issue key
       contractVersion:
         type: string
-        description: API contract version
       analysisSummary:
         type: string
-        description: One-line QA decision summary
       requirementStatus:
         type: string
-        description: READY or BLOCKED
       featureSummary:
         type: string
-        description: One-sentence feature description
       riskLevel:
         type: string
-        description: LOW / MEDIUM / HIGH
       riskScore:
         type: integer
-        description: Risk score 0-100
       releaseRecommendation:
         type: string
-        description: Go / Caution / Block
       automationRecommendation:
         type: string
-        description: Automation strategy
       stages:
         $ref: '#/definitions/QaStages'
 
@@ -394,119 +472,11 @@ definitions:
         type: integer
       analyzedAt:
         type: string
-        description: ISO 8601 timestamp
       pipelineDurationMs:
         type: integer
       completedAt:
         type: string
-        description: ISO 8601 timestamp — set when ticket moves to Done
       releaseSummary:
         type: string
-        description: LLM-generated QA release summary with verdict
 
 securityDefinitions: {}
-
-  /qa/api/v1/intelligence/released/summary:
-    get:
-      operationId: getReleasedSummaryForCopilot
-      summary: Get released tickets summary (Copilot-friendly)
-      description: Returns released tickets in a formatted, human-readable structure. Use this in Copilot Studio instead of getReleasedTickets for better formatting.
-      produces:
-        - application/json
-      responses:
-        '200':
-          description: Formatted released tickets summary
-          schema:
-            type: object
-            properties:
-              count:
-                type: integer
-              message:
-                type: string
-                description: Human-readable formatted summary
-              tickets:
-                type: array
-                items:
-                  type: object
-
-  /qa/api/v1/intelligence/trends:
-    get:
-      operationId: getRiskTrends
-      summary: Get risk trends across all re-analyzed issues
-      description: Returns risk trend data for tickets analyzed more than once. Shows avg/min/max risk score and trend direction (INCREASING/DECREASING/STABLE).
-      produces:
-        - application/json
-      responses:
-        '200':
-          description: Risk trend data
-          schema:
-            type: array
-            items:
-              type: object
-              properties:
-                issueKey:
-                  type: string
-                avgRiskScore:
-                  type: integer
-                minRiskScore:
-                  type: integer
-                maxRiskScore:
-                  type: integer
-                analysisCount:
-                  type: integer
-                trend:
-                  type: string
-                  description: INCREASING / DECREASING / STABLE
-
-  /qa/api/v1/intelligence/trends/{issueKey}:
-    get:
-      operationId: getIssueTrend
-      summary: Get risk trend timeline for a specific issue
-      description: Returns the full risk score timeline for a Jira issue, showing how risk evolved across multiple analyses.
-      produces:
-        - application/json
-      parameters:
-        - name: issueKey
-          in: path
-          required: true
-          type: string
-      responses:
-        '200':
-          description: Issue risk trend timeline
-          schema:
-            type: object
-            properties:
-              issueKey:
-                type: string
-              analysisCount:
-                type: integer
-              firstRiskScore:
-                type: integer
-              latestRiskScore:
-                type: integer
-              trend:
-                type: string
-              timeline:
-                type: array
-                items:
-                  type: object
-
-  /qa/api/v1/intelligence/reanalyzed:
-    get:
-      operationId: getReanalyzedIssues
-      summary: Get most re-analyzed issues
-      description: Returns Jira issues that have been analyzed more than once, ordered by analysis count.
-      produces:
-        - application/json
-      responses:
-        '200':
-          description: Re-analyzed issues
-          schema:
-            type: array
-            items:
-              type: object
-              properties:
-                issueKey:
-                  type: string
-                analysisCount:
-                  type: integer
