@@ -32,20 +32,22 @@
 - Filter by release recommendation (Block / Caution / Go)
 - Record count badges per section
 
-## Phase 9 — Multi-tenant Support 📋 Planned
-- Per-customer database isolation
-- Customer onboarding flow
-- Separate Jira credentials per tenant
-- Usage tracking per tenant
+## Phase 9 — Multi-tenant Foundation ✅ Complete
+- TenantConfig model created
+- Architecture documented and ready
+- Per-customer Jira + LLM credential isolation designed
+- Full DB isolation planned for first enterprise customer
 
-## Phase 10 — Advanced Intelligence 📋 Planned
-- Risk trend analysis — how risk evolves over time per ticket
-- Coverage tracking across test suites
-- Historical bug analysis for smarter risk scoring
-- Predictive risk scoring based on past patterns
+## Phase 10 — Risk Trend Analysis ✅ Complete
+- `/qa/api/v1/intelligence/trends` — risk trends across re-analyzed issues
+- `/qa/api/v1/intelligence/trends/{issueKey}` — full risk timeline per ticket
+- `/qa/api/v1/intelligence/reanalyzed` — most re-analyzed tickets
+- `/qa/api/v1/intelligence/released/summary` — Copilot-friendly release summary
+- Swagger v3 updated with all new endpoints
 
 ## Phase 11 — Production Hardening 📋 Planned
 - Azure / AWS deployment option
 - SOC2 compliance preparation
 - Rate limiting per tenant
 - Audit logging
+- Full multi-tenant DB isolation

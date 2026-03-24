@@ -90,7 +90,7 @@ Jira (webhook) / Copilot Studio / Power Automate
 | `agent_automation_builder` | "Automation strategy" | `analyzeQaIssue` |
 | `agent_bug_reporter` | "Create bug report" | `analyzeQaIssue` |
 | `agent_intelligence_summary` | "QA summary / risk status" | `getIntelligenceSummary` |
-| `agent_release_summary` | "Released tickets / verdict" | `getReleasedTickets` |
+| `agent_release_summary` | "Released tickets / verdict" | `getReleasedSummaryForCopilot` |
 
 ---
 
@@ -100,9 +100,9 @@ Jira (webhook) / Copilot Studio / Power Automate
 
 - Metrics: total analyses, avg risk, blocked, released
 - Risk distribution chart + Release decision chart
-- Recent analyses — **searchable, filterable by risk and release**
-- Blocked tickets — **searchable**
-- Released tickets with QA verdicts — **searchable**
+- Recent analyses — searchable, filterable by risk and release
+- Blocked tickets — searchable
+- Released tickets with QA verdicts — searchable
 
 ---
 
@@ -132,6 +132,10 @@ Setup: Jira → System → WebHooks → URL: `https://qa-orchestrator-service.on
 | GET | `/qa/api/v1/intelligence/high-risk` | HIGH risk analyses |
 | GET | `/qa/api/v1/intelligence/blocked` | Blocked analyses |
 | GET | `/qa/api/v1/intelligence/released` | Released tickets + QA summaries |
+| GET | `/qa/api/v1/intelligence/released/summary` | Released summary (Copilot-friendly) |
+| GET | `/qa/api/v1/intelligence/trends` | Risk trends across re-analyzed issues |
+| GET | `/qa/api/v1/intelligence/trends/{issueKey}` | Risk timeline for specific issue |
+| GET | `/qa/api/v1/intelligence/reanalyzed` | Most re-analyzed issues |
 
 ---
 
@@ -169,6 +173,6 @@ Setup: Jira → System → WebHooks → URL: `https://qa-orchestrator-service.on
 | 6 | ✅ | Full lifecycle — webhook, release summary, LLM providers |
 | 7 | ✅ | Copilot Studio v2 — intelligence + release topics |
 | 8 | ✅ | Dashboard — search, filtering, record counts |
-| 9 | 📋 | Multi-tenant — per-customer isolation |
-| 10 | 📋 | Advanced intelligence — risk trends, coverage tracking |
+| 9 | ✅ | Multi-tenant foundation — TenantConfig, architecture ready |
+| 10 | ✅ | Risk trend analysis — timeline, trends, reanalyzed issues |
 | 11 | 📋 | Production hardening — Azure/AWS, SOC2, rate limiting |
