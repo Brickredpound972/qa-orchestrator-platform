@@ -10,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.qa.qa_orchestrator_service.util.IssueKeyNormalizer;
 
 import java.util.List;
 import java.util.Map;
@@ -19,7 +20,7 @@ import java.util.Map;
  *
  * Handles Jira webhook events:
  * - "In Progress" → triggers full QA analysis pipeline
- * - "Done"        → generates QA release summary from history
+ * - "Done" → generates QA release summary from history
  */
 @RestController
 @RequestMapping("/qa/webhook")
@@ -92,8 +93,8 @@ public class JiraWebhookController {
                 "issueKey", issueKey,
                 "riskLevel", result.getRiskLevel() != null ? result.getRiskLevel() : "UNKNOWN",
                 "riskScore", result.getRiskScore() != null ? result.getRiskScore() : 0,
-                "releaseRecommendation", result.getReleaseRecommendation() != null ? result.getReleaseRecommendation() : "UNKNOWN"
-        ));
+                "releaseRecommendation",
+                result.getReleaseRecommendation() != null ? result.getReleaseRecommendation() : "UNKNOWN"));
     }
 
     private ResponseEntity<Map<String, Object>> handleDone(String issueKey) {
@@ -117,8 +118,7 @@ public class JiraWebhookController {
         return ResponseEntity.ok(Map.of(
                 "status", "release_summary_generated",
                 "issueKey", issueKey,
-                "analysesReviewed", history.size()
-        ));
+                "analysesReviewed", history.size()));
     }
 
     private String extractIssueKey(Map<String, Object> payload) {
@@ -126,7 +126,8 @@ public class JiraWebhookController {
             Object issue = payload.get("issue");
             if (issue instanceof Map) {
                 Object key = ((Map<?, ?>) issue).get("key");
-                if (key != null) return key.toString();
+                if (key != null)
+                    return IssueKeyNormalizer.normalize(key.toString());
             }
         } catch (Exception e) {
             log.warn("[WEBHOOK] Could not extract issue key: {}", e.getMessage());
@@ -145,7 +146,8 @@ public class JiraWebhookController {
                             Map<?, ?> itemMap = (Map<?, ?>) item;
                             if ("status".equals(itemMap.get("field"))) {
                                 Object toString = itemMap.get("toString");
-                                if (toString != null) return toString.toString();
+                                if (toString != null)
+                                    return toString.toString();
                             }
                         }
                     }
